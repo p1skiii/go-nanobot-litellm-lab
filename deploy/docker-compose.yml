@@ -15,7 +15,7 @@ services:
       - litellm
 
   litellm:
-    image: ghcr.io/berriai/litellm:main-stable
+    image: ghcr.io/berriai/litellm:main-latest
     command:
       - "--port"
       - "4000"

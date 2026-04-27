@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-M0 Harness Ready
+M1 Go Calls LiteLLM
 
 ## Completed
 
@@ -13,10 +13,18 @@ M0 Harness Ready
 - `go test ./...` passed
 - `/health` verified with local server on `:18080`
 - `docker compose -f deploy/docker-compose.yml config` passed
+- M0 committed as `865ac58`
+- `POST /tasks/review-diff` implemented
+- task id and request id returned
+- in-memory task store implemented
+- `GET /tasks/{id}` reads stored task result
+- Go service calls LiteLLM Proxy non-stream
+- timeout maps to 504 and downstream errors map to 502
+- Docker LiteLLM Proxy mock response verified
 
 ## In Progress
 
-- none
+- M1 documentation and commit
 
 ## Blocked
 
@@ -24,4 +32,4 @@ M0 Harness Ready
 
 ## Next Step
 
-Start M1 `/tasks/review-diff` skeleton without LiteLLM integration.
+Start M2 LiteLLM behavior study: fallback, usage, streaming, and rate limit/budget notes.

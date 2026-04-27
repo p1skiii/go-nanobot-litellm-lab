@@ -3,6 +3,7 @@ model_list:
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
+      mock_response: "M1 LiteLLM mock review response"
   - model_name: code-smart
     litellm_params:
       model: openai/gpt-4.1

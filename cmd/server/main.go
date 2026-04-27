@@ -12,15 +12,26 @@ import (
 
 	"go-nanobot-litellm-lab/internal/api"
 	"go-nanobot-litellm-lab/internal/config"
+	"go-nanobot-litellm-lab/internal/litellm"
+	"go-nanobot-litellm-lab/internal/tasks"
 )
 
 func main() {
 	cfg := config.Load()
 	logger := log.New(os.Stdout, "", log.LstdFlags|log.LUTC)
+	reviewer, err := litellm.NewClient(litellm.Config{
+		BaseURL: cfg.LiteLLMBaseURL,
+		APIKey:  cfg.LiteLLMAPIKey,
+		Model:   cfg.LiteLLMModel,
+		Timeout: cfg.LiteLLMTimeout,
+	})
+	if err != nil {
+		logger.Fatalf("litellm client config failed: %v", err)
+	}
 
 	server := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewHandler(),
+		Handler:           api.NewHandler(api.Options{Store: tasks.NewStore(), Reviewer: reviewer, RequestTimeout: cfg.LiteLLMTimeout, Logger: logger}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

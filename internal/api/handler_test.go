@@ -1,10 +1,18 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
+
+	"go-nanobot-litellm-lab/internal/litellm"
+	"go-nanobot-litellm-lab/internal/tasks"
 )
 
 func TestHealth(t *testing.T) {
@@ -48,4 +56,195 @@ func TestHealthRejectsUnsupportedMethod(t *testing.T) {
 	if got := rec.Header().Get("Allow"); got != http.MethodGet {
 		t.Fatalf("allow = %q, want %q", got, http.MethodGet)
 	}
+}
+
+func TestReviewDiffSuccessStoresTask(t *testing.T) {
+	store := tasks.NewStore()
+	reviewer := &fakeReviewer{
+		resp: litellm.ReviewResponse{
+			Result:    "review result",
+			Model:     "code-cheap",
+			LatencyMS: 25,
+		},
+	}
+	body := stringsReader(`{"diff":"diff --git a/a.go b/a.go","repo_summary":"Go service","stream":false}`)
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", body)
+	req.Header.Set("X-Request-ID", "req-test")
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Store: store, Reviewer: reviewer, RequestTimeout: time.Second}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp taskResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.TaskID == "" {
+		t.Fatalf("task id is empty")
+	}
+	if resp.RequestID != "req-test" {
+		t.Fatalf("request id = %q, want req-test", resp.RequestID)
+	}
+	if resp.Status != string(tasks.StatusSuccess) {
+		t.Fatalf("status = %q, want success", resp.Status)
+	}
+	if resp.Result != "review result" {
+		t.Fatalf("result = %q, want review result", resp.Result)
+	}
+
+	got, ok := store.Get(resp.TaskID)
+	if !ok {
+		t.Fatalf("stored task not found")
+	}
+	if got.Result != "review result" {
+		t.Fatalf("stored result = %q, want review result", got.Result)
+	}
+	if reviewer.req.RequestID != "req-test" {
+		t.Fatalf("reviewer request id = %q, want req-test", reviewer.req.RequestID)
+	}
+}
+
+func TestGetTask(t *testing.T) {
+	store := tasks.NewStore()
+	store.Save(tasks.Task{
+		ID:        "task_test",
+		RequestID: "req_test",
+		Status:    tasks.StatusSuccess,
+		Result:    "ok",
+		Model:     "code-cheap",
+		LatencyMS: 10,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/tasks/task_test", nil)
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Store: store}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp taskResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.TaskID != "task_test" {
+		t.Fatalf("task id = %q, want task_test", resp.TaskID)
+	}
+}
+
+func TestReviewDiffRejectsEmptyDiff(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"  "}`))
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Reviewer: &fakeReviewer{}}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestReviewDiffRejectsStreaming(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff","stream":true}`))
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Reviewer: &fakeReviewer{}}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestReviewDiffMapsTimeoutTo504(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff"}`))
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Reviewer: &fakeReviewer{err: &litellm.Error{Kind: litellm.KindTimeout, Err: context.DeadlineExceeded}}}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("status = %d, want 504; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestReviewDiffMapsDownstreamErrorTo502(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff"}`))
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Reviewer: &fakeReviewer{err: &litellm.Error{Kind: litellm.KindDownstream, Err: errors.New("downstream failed")}}}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestReviewDiffEndToEndWithMockLiteLLM(t *testing.T) {
+	mockLiteLLM := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("path = %q, want /v1/chat/completions", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"model": "code-cheap",
+			"choices": [
+				{"message": {"role": "assistant", "content": "mock review from litellm"}}
+			]
+		}`))
+	}))
+	defer mockLiteLLM.Close()
+
+	reviewer, err := litellm.NewClient(litellm.Config{
+		BaseURL: mockLiteLLM.URL,
+		Model:   "code-cheap",
+		Timeout: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("new litellm client: %v", err)
+	}
+
+	app := httptest.NewServer(NewHandler(Options{Store: tasks.NewStore(), Reviewer: reviewer, RequestTimeout: time.Second}))
+	defer app.Close()
+
+	resp, err := http.Post(app.URL+"/tasks/review-diff", "application/json", stringsReader(`{"diff":"diff --git a/a.go b/a.go"}`))
+	if err != nil {
+		t.Fatalf("post review diff: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read response: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", resp.StatusCode, body)
+	}
+
+	var decoded taskResponse
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if decoded.Result != "mock review from litellm" {
+		t.Fatalf("result = %q, want mock review from litellm", decoded.Result)
+	}
+	if decoded.Model != "code-cheap" {
+		t.Fatalf("model = %q, want code-cheap", decoded.Model)
+	}
+}
+
+type fakeReviewer struct {
+	req  litellm.ReviewRequest
+	resp litellm.ReviewResponse
+	err  error
+}
+
+func (f *fakeReviewer) ReviewDiff(_ context.Context, req litellm.ReviewRequest) (litellm.ReviewResponse, error) {
+	f.req = req
+	return f.resp, f.err
+}
+
+func stringsReader(s string) *strings.Reader {
+	return strings.NewReader(s)
 }
