@@ -1,0 +1,13 @@
+models:
+  - alias: code-cheap
+    quality: 0.6
+    cost: 0.2
+    latency: 0.8
+    context_limit: 128000
+    supports_stream: true
+  - alias: code-smart
+    quality: 0.9
+    cost: 0.7
+    latency: 0.5
+    context_limit: 128000
+    supports_stream: true

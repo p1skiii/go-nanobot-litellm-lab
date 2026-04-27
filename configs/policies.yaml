@@ -1,0 +1,19 @@
+defaults:
+  task_type: review_diff
+  model_alias: code-cheap
+  fallback_chain:
+    - code-smart
+
+router:
+  scoring:
+    quality_weight: 0.5
+    cost_weight: 0.3
+    latency_weight: 0.2
+
+context:
+  default_actions:
+    current_diff: keep
+    repo_summary: keep
+    old_plan: compress
+    old_logs: compress
+    irrelevant_notes: drop

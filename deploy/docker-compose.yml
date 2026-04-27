@@ -1,0 +1,30 @@
+name: go-nanobot-litellm-lab
+
+services:
+  nanobot:
+    image: go-nanobot-litellm-lab:local
+    profiles:
+      - m5
+    environment:
+      NANOBOT_ADDR: ":8080"
+      LITELLM_BASE_URL: "http://litellm:4000"
+      LITELLM_API_KEY: "${LITELLM_MASTER_KEY:-sk-local-dev}"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - litellm
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    command:
+      - "--port"
+      - "4000"
+      - "--config"
+      - "/app/config.yaml"
+    environment:
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-sk-local-dev}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+    volumes:
+      - "../configs/litellm.yaml:/app/config.yaml:ro"
+    ports:
+      - "4000:4000"
