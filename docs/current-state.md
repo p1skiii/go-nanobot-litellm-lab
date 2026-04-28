@@ -6,6 +6,7 @@ M1 Go Calls LiteLLM
 
 ## Completed
 
+- Remote repository created at `https://github.com/p1skiii/go-nanobot-litellm-lab`
 - Go toolchain installed with Homebrew
 - Repo skeleton created
 - Harness docs, ADRs, specs, and test plans created
@@ -21,10 +22,12 @@ M1 Go Calls LiteLLM
 - Go service calls LiteLLM Proxy non-stream
 - timeout maps to 504 and downstream errors map to 502
 - Docker LiteLLM Proxy mock response verified
+- M1 committed as `dae5fc7`
+- `main` pushed to `origin/main`
 
 ## In Progress
 
-- M1 documentation and commit
+- none
 
 ## Blocked
 
