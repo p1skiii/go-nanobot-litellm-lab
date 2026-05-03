@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-M1 Go Calls LiteLLM
+M3 Custom ContextManager
 
 ## Completed
 
@@ -24,6 +24,19 @@ M1 Go Calls LiteLLM
 - Docker LiteLLM Proxy mock response verified
 - M1 committed as `dae5fc7`
 - `main` pushed to `origin/main`
+- Previous M2 mock-only observations reclassified as synthetic/local baseline
+- M2 real provider-backed Xiaomi MiMo direct API sanity check completed
+- M2 real provider-backed LiteLLM fallback experiment completed
+- M2 real provider-backed LiteLLM usage fields experiment completed
+- M2 real provider-backed LiteLLM streaming experiment completed
+- M2 real provider-backed LiteLLM rate limit / budget experiment completed
+- M2 real provider-backed LiteLLM downstream error mapping experiment completed
+- Existing Go service verified through LiteLLM to real Xiaomi MiMo provider
+- M3 ContextManager implemented with deterministic keep/compress/drop rules
+- M3 `review-diff` now builds governed `final_context` before LiteLLM call
+- M3 API response now includes `context_report` block decisions
+- M3 tests added for ContextManager and API/LiteLLM context wiring
+- M3 `go test ./...` passed
 
 ## In Progress
 
@@ -35,4 +48,4 @@ M1 Go Calls LiteLLM
 
 ## Next Step
 
-Start M2 LiteLLM behavior study: fallback, usage, streaming, and rate limit/budget notes.
+Run a real-provider M3 smoke test through LiteLLM and decide whether to start M4 PolicyRouter or first add lightweight LiteLLM metadata capture.

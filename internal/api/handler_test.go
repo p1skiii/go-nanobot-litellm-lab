@@ -94,6 +94,12 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 	if resp.Result != "review result" {
 		t.Fatalf("result = %q, want review result", resp.Result)
 	}
+	if resp.ContextReport == nil {
+		t.Fatalf("context report is nil")
+	}
+	if !contains(resp.ContextReport.KeptBlocks, "current_diff") {
+		t.Fatalf("kept blocks missing current_diff: %+v", resp.ContextReport.KeptBlocks)
+	}
 
 	got, ok := store.Get(resp.TaskID)
 	if !ok {
@@ -104,6 +110,9 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 	}
 	if reviewer.req.RequestID != "req-test" {
 		t.Fatalf("reviewer request id = %q, want req-test", reviewer.req.RequestID)
+	}
+	if strings.TrimSpace(reviewer.req.FinalContext) == "" {
+		t.Fatalf("reviewer final context is empty")
 	}
 }
 
@@ -247,4 +256,13 @@ func (f *fakeReviewer) ReviewDiff(_ context.Context, req litellm.ReviewRequest) 
 
 func stringsReader(s string) *strings.Reader {
 	return strings.NewReader(s)
+}
+
+func contains(list []string, needle string) bool {
+	for _, v := range list {
+		if v == needle {
+			return true
+		}
+	}
+	return false
 }

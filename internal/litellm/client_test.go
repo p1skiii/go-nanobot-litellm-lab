@@ -148,3 +148,36 @@ func TestReviewDiffMapsTimeout(t *testing.T) {
 		t.Fatalf("kind = %q, want timeout", llmErr.Kind)
 	}
 }
+
+func TestReviewDiffUsesFinalContextWhenProvided(t *testing.T) {
+	var captured chatCompletionRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"model":"code-cheap","choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(Config{BaseURL: server.URL, Model: "code-cheap", Timeout: time.Second})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	_, err = client.ReviewDiff(context.Background(), ReviewRequest{
+		Diff:         "diff --git",
+		RepoSummary:  "summary",
+		FinalContext: "FINAL_CONTEXT_PAYLOAD",
+	})
+	if err != nil {
+		t.Fatalf("review diff: %v", err)
+	}
+
+	if len(captured.Messages) != 2 {
+		t.Fatalf("messages len = %d, want 2", len(captured.Messages))
+	}
+	if captured.Messages[1].Content != "FINAL_CONTEXT_PAYLOAD" {
+		t.Fatalf("user content = %q, want FINAL_CONTEXT_PAYLOAD", captured.Messages[1].Content)
+	}
+}

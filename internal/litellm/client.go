@@ -28,9 +28,10 @@ type Client struct {
 }
 
 type ReviewRequest struct {
-	Diff        string
-	RepoSummary string
-	RequestID   string
+	Diff         string
+	RepoSummary  string
+	FinalContext string
+	RequestID    string
 }
 
 type ReviewResponse struct {
@@ -111,7 +112,7 @@ func (c *Client) ReviewDiff(ctx context.Context, req ReviewRequest) (ReviewRespo
 			},
 			{
 				Role:    "user",
-				Content: buildReviewPrompt(req.Diff, req.RepoSummary),
+				Content: buildReviewPrompt(req),
 			},
 		},
 		Stream: false,
@@ -176,15 +177,19 @@ func (c *Client) ReviewDiff(ctx context.Context, req ReviewRequest) (ReviewRespo
 	}, nil
 }
 
-func buildReviewPrompt(diff, repoSummary string) string {
+func buildReviewPrompt(req ReviewRequest) string {
+	if strings.TrimSpace(req.FinalContext) != "" {
+		return req.FinalContext
+	}
+
 	var b strings.Builder
-	if strings.TrimSpace(repoSummary) != "" {
+	if strings.TrimSpace(req.RepoSummary) != "" {
 		b.WriteString("Repository summary:\n")
-		b.WriteString(strings.TrimSpace(repoSummary))
+		b.WriteString(strings.TrimSpace(req.RepoSummary))
 		b.WriteString("\n\n")
 	}
 	b.WriteString("Review this diff:\n")
-	b.WriteString(strings.TrimSpace(diff))
+	b.WriteString(strings.TrimSpace(req.Diff))
 	return b.String()
 }
 

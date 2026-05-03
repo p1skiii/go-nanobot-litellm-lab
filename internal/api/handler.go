@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go-nanobot-litellm-lab/internal/contextmgr"
 	"go-nanobot-litellm-lab/internal/litellm"
 	"go-nanobot-litellm-lab/internal/tasks"
 )
@@ -19,9 +20,14 @@ type Reviewer interface {
 	ReviewDiff(ctx context.Context, req litellm.ReviewRequest) (litellm.ReviewResponse, error)
 }
 
+type ContextManager interface {
+	Build(input contextmgr.Input) (contextmgr.Output, error)
+}
+
 type Options struct {
 	Store          *tasks.Store
 	Reviewer       Reviewer
+	ContextManager ContextManager
 	RequestTimeout time.Duration
 	Logger         *log.Logger
 }
@@ -29,6 +35,7 @@ type Options struct {
 type Handler struct {
 	store          *tasks.Store
 	reviewer       Reviewer
+	contextManager ContextManager
 	requestTimeout time.Duration
 	logger         *log.Logger
 }
@@ -41,17 +48,27 @@ type healthResponse struct {
 type reviewDiffRequest struct {
 	Diff        string `json:"diff"`
 	RepoSummary string `json:"repo_summary"`
+	PriorPlan   string `json:"prior_plan"`
+	Logs        string `json:"logs"`
+	Notes       string `json:"notes"`
 	Stream      bool   `json:"stream"`
 }
 
+type contextReport struct {
+	KeptBlocks       []string `json:"kept_blocks,omitempty"`
+	CompressedBlocks []string `json:"compressed_blocks,omitempty"`
+	DroppedBlocks    []string `json:"dropped_blocks,omitempty"`
+}
+
 type taskResponse struct {
-	TaskID    string `json:"task_id"`
-	RequestID string `json:"request_id,omitempty"`
-	Status    string `json:"status"`
-	Result    string `json:"result,omitempty"`
-	Model     string `json:"model,omitempty"`
-	LatencyMS int64  `json:"latency_ms"`
-	Error     string `json:"error,omitempty"`
+	TaskID        string         `json:"task_id"`
+	RequestID     string         `json:"request_id,omitempty"`
+	Status        string         `json:"status"`
+	Result        string         `json:"result,omitempty"`
+	Model         string         `json:"model,omitempty"`
+	LatencyMS     int64          `json:"latency_ms"`
+	Error         string         `json:"error,omitempty"`
+	ContextReport *contextReport `json:"context_report,omitempty"`
 }
 
 func NewHandler(opts ...Options) http.Handler {
@@ -65,6 +82,9 @@ func NewHandler(opts ...Options) http.Handler {
 	if options.RequestTimeout <= 0 {
 		options.RequestTimeout = 30 * time.Second
 	}
+	if options.ContextManager == nil {
+		options.ContextManager = contextmgr.NewManager(contextmgr.Config{})
+	}
 	if options.Logger == nil {
 		options.Logger = log.Default()
 	}
@@ -72,6 +92,7 @@ func NewHandler(opts ...Options) http.Handler {
 	h := &Handler{
 		store:          options.Store,
 		reviewer:       options.Reviewer,
+		contextManager: options.ContextManager,
 		requestTimeout: options.RequestTimeout,
 		logger:         options.Logger,
 	}
@@ -129,14 +150,35 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 
 	taskID := tasks.NewID("task")
 	requestID := requestIDFrom(r)
+	contextOut, err := h.contextManager.Build(contextmgr.Input{
+		CurrentDiff:     req.Diff,
+		RepoSummary:     req.RepoSummary,
+		PriorPlan:       req.PriorPlan,
+		OldLogs:         req.Logs,
+		IrrelevantNotes: req.Notes,
+	})
+	if err != nil {
+		if errors.Is(err, contextmgr.ErrNoUsableContext) {
+			writeError(w, http.StatusBadRequest, "no usable context")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "invalid context input")
+		return
+	}
+	report := contextReport{
+		KeptBlocks:       contextOut.KeptBlocks,
+		CompressedBlocks: contextOut.CompressedBlocks,
+		DroppedBlocks:    contextOut.DroppedBlocks,
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.requestTimeout)
 	defer cancel()
 
 	resp, err := h.reviewer.ReviewDiff(ctx, litellm.ReviewRequest{
-		Diff:        req.Diff,
-		RepoSummary: req.RepoSummary,
-		RequestID:   requestID,
+		Diff:         req.Diff,
+		RepoSummary:  req.RepoSummary,
+		FinalContext: contextOut.FinalContext,
+		RequestID:    requestID,
 	})
 	if err != nil {
 		statusCode := mapLiteLLMError(err)
@@ -147,7 +189,9 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 			Error:     err.Error(),
 		})
 		h.logger.Printf("review_diff failed task_id=%s request_id=%s status=%d error=%v", taskID, requestID, statusCode, err)
-		writeJSON(w, statusCode, responseFromTask(task))
+		resp := responseFromTask(task)
+		resp.ContextReport = &report
+		writeJSON(w, statusCode, resp)
 		return
 	}
 
@@ -161,7 +205,9 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 	})
 
 	h.logger.Printf("review_diff success task_id=%s request_id=%s model=%s latency_ms=%d", taskID, requestID, resp.Model, resp.LatencyMS)
-	writeJSON(w, http.StatusOK, responseFromTask(task))
+	response := responseFromTask(task)
+	response.ContextReport = &report
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) getTask(w http.ResponseWriter, r *http.Request) {
