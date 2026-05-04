@@ -35,7 +35,8 @@ func TestReviewDiffCallsChatCompletion(t *testing.T) {
 			"model": "code-cheap",
 			"choices": [
 				{"message": {"role": "assistant", "content": "looks good"}}
-			]
+			],
+			"usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18}
 		}`))
 	}))
 	defer server.Close()
@@ -79,6 +80,15 @@ func TestReviewDiffCallsChatCompletion(t *testing.T) {
 	}
 	if resp.Model != "code-cheap" {
 		t.Fatalf("response model = %q, want code-cheap", resp.Model)
+	}
+	if resp.Usage.PromptTokens != 11 {
+		t.Fatalf("prompt tokens = %d, want 11", resp.Usage.PromptTokens)
+	}
+	if resp.Usage.CompletionTokens != 7 {
+		t.Fatalf("completion tokens = %d, want 7", resp.Usage.CompletionTokens)
+	}
+	if resp.Usage.TotalTokens != 18 {
+		t.Fatalf("total tokens = %d, want 18", resp.Usage.TotalTokens)
 	}
 }
 

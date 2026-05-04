@@ -15,6 +15,7 @@ import (
 	"go-nanobot-litellm-lab/internal/litellm"
 	"go-nanobot-litellm-lab/internal/router"
 	"go-nanobot-litellm-lab/internal/tasks"
+	"go-nanobot-litellm-lab/internal/usage"
 )
 
 func main() {
@@ -33,10 +34,14 @@ func main() {
 	if err != nil {
 		logger.Fatalf("policy router config failed: %v", err)
 	}
+	usageLogger, err := usage.NewJSONLLogger(cfg.UsageLogPath)
+	if err != nil {
+		logger.Fatalf("usage logger config failed: %v", err)
+	}
 
 	server := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewHandler(api.Options{Store: tasks.NewStore(), Reviewer: reviewer, PolicyRouter: policyRouter, RequestTimeout: cfg.LiteLLMTimeout, Logger: logger}),
+		Handler:           api.NewHandler(api.Options{Store: tasks.NewStore(), Reviewer: reviewer, PolicyRouter: policyRouter, UsageLogger: usageLogger, RequestTimeout: cfg.LiteLLMTimeout, Logger: logger}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

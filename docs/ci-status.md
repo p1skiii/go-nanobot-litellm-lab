@@ -2,8 +2,8 @@
 
 ## Last Run
 
-Date: 2026-05-04 12:28:29 CST
-Commit: working tree on base `4931ac4`
+Date: 2026-05-05 00:11:10 CST
+Commit: working tree on base `729ec36`
 
 ## Commands
 
@@ -52,6 +52,21 @@ Commit: working tree on base `4931ac4`
 | M1-M4 documentation sync | pass | proposal, milestone summary, specs, test plans, roadmap, README, and harness rule updated |
 | `go test ./...` after documentation sync | pass | all packages passed |
 | documentation sync real provider smoke | pass | Go -> LiteLLM -> Xiaomi MiMo returned `200`, `model=code-smart`, `route_reason`, and `context_report` |
+| `gofmt -w ...` for M5 UsageLogger | pass | formatted usage logger, API, config, LiteLLM, and server changes |
+| `go test ./...` for M5 | pass | all packages passed, including `internal/usage` |
+| M5 real provider E2E | pass | Go -> LiteLLM -> Xiaomi MiMo returned `200`, `model=code-smart`, `context_report`, and `route_reason` |
+| M5 usage JSONL verification | pass | `/tmp/nanobot-m5/usage.jsonl` recorded task id, request id, model alias, returned model, route reason, latency, token usage, and success status |
+| `docker compose -f deploy/docker-compose.yml config` | pass | compose config renders Go build service, LiteLLM service, and usage volume |
+| `docker info` | blocked | Docker daemon unavailable, so full `docker compose up` runtime verification was not possible in this run |
+| `go test ./...` after M5 docs status sync | pass | all packages passed |
+| M5 real provider E2E rerun after docs status sync | pass | Go -> LiteLLM -> Xiaomi MiMo returned `200`, `model=code-smart`, `route_reason`, `context_report`, and usage JSONL token fields |
+| `docker info` after opening Docker Desktop | pass | Docker Desktop daemon available, server version `28.0.4` |
+| initial M5 Docker Compose runtime E2E | expected fail | real provider request reached Compose stack but Go timed out at 30s; failed usage record was written |
+| local Linux binary build for `scratch` nanobot image | pass | built `deploy/bin/nanobot` as linux/arm64 static binary for Compose image |
+| `docker compose -f deploy/docker-compose.yml up --build -d` | pass | Compose started `litellm` and `nanobot` containers |
+| M5 Docker Compose runtime E2E | pass | Go container -> LiteLLM container -> Xiaomi MiMo returned `200`, `model=code-cheap`, `context_report`, and `route_reason` |
+| M5 Docker Compose usage JSONL verification | pass | `data/usage.jsonl` recorded model alias, returned model, route reason, latency, prompt/completion/total tokens, and success status |
+| `go test ./...` after M5 Compose verification | pass | all packages passed |
 
 ## Known Failures
 

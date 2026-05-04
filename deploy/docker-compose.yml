@@ -3,16 +3,24 @@ name: go-nanobot-litellm-lab
 services:
   nanobot:
     image: go-nanobot-litellm-lab:local
-    profiles:
-      - m5
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
     environment:
       NANOBOT_ADDR: ":8080"
       LITELLM_BASE_URL: "http://litellm:4000"
       LITELLM_API_KEY: "${LITELLM_MASTER_KEY:-sk-local-dev}"
+      LITELLM_MODEL: "code-cheap"
+      LITELLM_TIMEOUT: "60s"
+      NANOBOT_MODELS_CONFIG: "/app/configs/models.yaml"
+      NANOBOT_POLICIES_CONFIG: "/app/configs/policies.yaml"
+      NANOBOT_USAGE_LOG_PATH: "/data/usage.jsonl"
     ports:
       - "8080:8080"
     depends_on:
       - litellm
+    volumes:
+      - "../data:/data"
 
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
@@ -23,7 +31,7 @@ services:
       - "/app/config.yaml"
     environment:
       LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-sk-local-dev}"
-      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      MIMO_API_KEY: "${MIMO_API_KEY:-}"
     volumes:
       - "../configs/litellm.yaml:/app/config.yaml:ro"
     ports:

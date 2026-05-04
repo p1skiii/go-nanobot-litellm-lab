@@ -1,0 +1,8 @@
+.git
+data
+dist
+bin
+*.test
+.env
+.env.*
+.DS_Store

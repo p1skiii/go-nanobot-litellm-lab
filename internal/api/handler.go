@@ -13,6 +13,7 @@ import (
 	"go-nanobot-litellm-lab/internal/litellm"
 	"go-nanobot-litellm-lab/internal/router"
 	"go-nanobot-litellm-lab/internal/tasks"
+	"go-nanobot-litellm-lab/internal/usage"
 )
 
 const serviceName = "go-nanobot-litellm-lab"
@@ -29,11 +30,16 @@ type PolicyRouter interface {
 	Route(input router.Input) (router.Decision, error)
 }
 
+type UsageLogger interface {
+	Log(record usage.Record) error
+}
+
 type Options struct {
 	Store          *tasks.Store
 	Reviewer       Reviewer
 	ContextManager ContextManager
 	PolicyRouter   PolicyRouter
+	UsageLogger    UsageLogger
 	RequestTimeout time.Duration
 	Logger         *log.Logger
 }
@@ -43,6 +49,7 @@ type Handler struct {
 	reviewer       Reviewer
 	contextManager ContextManager
 	policyRouter   PolicyRouter
+	usageLogger    UsageLogger
 	requestTimeout time.Duration
 	logger         *log.Logger
 }
@@ -97,6 +104,9 @@ func NewHandler(opts ...Options) http.Handler {
 	if options.PolicyRouter == nil {
 		options.PolicyRouter = router.NewDefault()
 	}
+	if options.UsageLogger == nil {
+		options.UsageLogger = usage.NoopLogger{}
+	}
 	if options.Logger == nil {
 		options.Logger = log.Default()
 	}
@@ -106,6 +116,7 @@ func NewHandler(opts ...Options) http.Handler {
 		reviewer:       options.Reviewer,
 		contextManager: options.ContextManager,
 		policyRouter:   options.PolicyRouter,
+		usageLogger:    options.UsageLogger,
 		requestTimeout: options.RequestTimeout,
 		logger:         options.Logger,
 	}
@@ -197,6 +208,7 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.requestTimeout)
 	defer cancel()
 
+	start := time.Now()
 	resp, err := h.reviewer.ReviewDiff(ctx, litellm.ReviewRequest{
 		Diff:         req.Diff,
 		RepoSummary:  req.RepoSummary,
@@ -212,7 +224,17 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 			Status:      tasks.StatusFailed,
 			Model:       decision.ModelAlias,
 			RouteReason: decision.RouteReason,
+			LatencyMS:   time.Since(start).Milliseconds(),
 			Error:       err.Error(),
+		})
+		h.logUsage(usage.Record{
+			TaskID:      task.ID,
+			RequestID:   task.RequestID,
+			ModelAlias:  decision.ModelAlias,
+			RouteReason: decision.RouteReason,
+			LatencyMS:   task.LatencyMS,
+			Status:      string(task.Status),
+			Error:       task.Error,
 		})
 		h.logger.Printf("review_diff failed task_id=%s request_id=%s status=%d model=%s route_reason=%q error=%v", taskID, requestID, statusCode, decision.ModelAlias, decision.RouteReason, err)
 		resp := responseFromTask(task)
@@ -229,6 +251,18 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 		Model:       decision.ModelAlias,
 		RouteReason: decision.RouteReason,
 		LatencyMS:   resp.LatencyMS,
+	})
+	h.logUsage(usage.Record{
+		TaskID:           task.ID,
+		RequestID:        task.RequestID,
+		ModelAlias:       decision.ModelAlias,
+		ReturnedModel:    resp.Model,
+		RouteReason:      decision.RouteReason,
+		LatencyMS:        resp.LatencyMS,
+		PromptTokens:     resp.Usage.PromptTokens,
+		CompletionTokens: resp.Usage.CompletionTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
+		Status:           string(task.Status),
 	})
 
 	h.logger.Printf("review_diff success task_id=%s request_id=%s model=%s route_reason=%q latency_ms=%d", taskID, requestID, decision.ModelAlias, decision.RouteReason, resp.LatencyMS)
@@ -278,6 +312,12 @@ func responseFromTask(task tasks.Task) taskResponse {
 		RouteReason: task.RouteReason,
 		LatencyMS:   task.LatencyMS,
 		Error:       task.Error,
+	}
+}
+
+func (h *Handler) logUsage(record usage.Record) {
+	if err := h.usageLogger.Log(record); err != nil {
+		h.logger.Printf("usage log failed task_id=%s error=%v", record.TaskID, err)
 	}
 }
 

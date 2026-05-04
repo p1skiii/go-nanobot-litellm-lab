@@ -44,6 +44,16 @@ Storage:
 - The directory should be configurable.
 - The usage log must be reviewable with standard shell tools.
 
+## Current Implementation
+
+- Usage records are written as append-only JSONL.
+- Default path is `data/usage.jsonl`.
+- `NANOBOT_USAGE_LOG_PATH` overrides the path.
+- Success records include task id, request id, selected model alias, returned model, route reason, latency, and token usage when LiteLLM returns it.
+- Downstream failure records include task id, request id, selected model alias, route reason, latency, failed status, and an error summary.
+- Usage write failure is logged but does not fail the task response.
+- Cost is not calculated locally in M5.
+
 ## Error Cases
 
 | Case | Expected |

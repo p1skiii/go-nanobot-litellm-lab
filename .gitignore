@@ -1,11 +1,13 @@
 # Go build output
 /bin/
 /dist/
+deploy/bin/
 *.test
 
 # Local environment
 .env
 .env.*
+data/
 
 # Editor and OS files
 .DS_Store

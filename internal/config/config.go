@@ -12,6 +12,7 @@ const defaultLiteLLMModel = "code-cheap"
 const defaultLiteLLMTimeout = 30 * time.Second
 const defaultModelsConfigPath = "configs/models.yaml"
 const defaultPoliciesConfigPath = "configs/policies.yaml"
+const defaultUsageLogPath = "data/usage.jsonl"
 
 type Config struct {
 	Addr               string
@@ -21,6 +22,7 @@ type Config struct {
 	LiteLLMTimeout     time.Duration
 	ModelsConfigPath   string
 	PoliciesConfigPath string
+	UsageLogPath       string
 }
 
 func Load() Config {
@@ -53,6 +55,10 @@ func Load() Config {
 	if policiesPath == "" {
 		policiesPath = defaultPoliciesConfigPath
 	}
+	usageLogPath := strings.TrimSpace(os.Getenv("NANOBOT_USAGE_LOG_PATH"))
+	if usageLogPath == "" {
+		usageLogPath = defaultUsageLogPath
+	}
 
 	return Config{
 		Addr:               addr,
@@ -62,5 +68,6 @@ func Load() Config {
 		LiteLLMTimeout:     timeout,
 		ModelsConfigPath:   modelsPath,
 		PoliciesConfigPath: policiesPath,
+		UsageLogPath:       usageLogPath,
 	}
 }

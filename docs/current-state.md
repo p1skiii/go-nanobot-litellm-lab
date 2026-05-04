@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-M4 Custom PolicyRouter
+M6 Local Lab Query Loop
 
 ## Completed
 
@@ -49,10 +49,23 @@ M4 Custom PolicyRouter
 - M4 real provider smoke passed for `budget_hint=low` -> `code-cheap`
 - M4 committed as `4931ac4`
 - M1-M4 documentation sync completed in proposal `docs/proposals/0001-sync-m1-m4-docs-and-prepare-m5.md`
+- M1-M4 documentation sync committed as `729ec36`
+- M5 UsageLogger implemented as append-only JSONL
+- M5 LiteLLM client extracts non-stream usage token fields
+- M5 API writes usage records for success and downstream failure paths
+- M5 usage write failure does not fail task responses
+- M5 default usage log path is `data/usage.jsonl`
+- M5 Dockerfile and compose build config added
+- M5 `go test ./...` passed
+- M5 real provider E2E passed and wrote a usage record with model, route, latency, and tokens
+- M5 real provider E2E rerun passed after documentation status sync
+- Docker Desktop started and Docker daemon verified
+- M5 Docker Compose runtime E2E passed with real Xiaomi MiMo provider
+- M5 Compose runtime request wrote usage JSONL with model, route, latency, and token usage
 
 ## In Progress
 
-- none
+- M6 planning
 
 ## Blocked
 
@@ -60,4 +73,4 @@ M4 Custom PolicyRouter
 
 ## Next Step
 
-Start M5 UsageLogger + Docker Compose using `docs/specs/0005-usage-logger.md` and `docs/test-plans/0005-usage-logger-test-plan.md`.
+Commit M5 UsageLogger, then create M6 proposal/spec/test plan for local usage query loop.

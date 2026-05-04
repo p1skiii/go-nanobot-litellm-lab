@@ -62,7 +62,16 @@ Exit:
 
 ## M5 UsageLogger + Docker Compose
 
-Status: next
+Status: done
+
+Current:
+
+- UsageLogger implemented as append-only local JSONL.
+- LiteLLM non-stream usage fields are captured when returned.
+- API writes usage records for success and downstream failure paths.
+- Usage write failure is logged and does not fail task responses.
+- Docker Compose config renders successfully.
+- Full `docker compose up` runtime verification passes with real Xiaomi MiMo provider.
 
 Exit:
 
@@ -71,3 +80,15 @@ Exit:
 - usage write failure does not fail the task
 - docker-compose starts Go service + LiteLLM
 - real provider end-to-end smoke test passes after implementation
+
+## M6 Local Lab Query Loop
+
+Status: next
+
+Exit:
+
+- usage records can be queried from the Go service
+- task and usage records can be correlated by task id
+- local smoke script demonstrates review task -> task lookup -> usage lookup
+- Docker Compose runtime E2E passes
+- real provider E2E passes after implementation

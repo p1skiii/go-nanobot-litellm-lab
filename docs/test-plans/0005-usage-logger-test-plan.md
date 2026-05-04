@@ -29,6 +29,16 @@
 | real provider success writes usage | Go service + LiteLLM + Xiaomi MiMo | `200`, task result, usage record with route/model/latency |
 | real provider routed request writes usage | `budget_hint=high_quality` | usage record has `model_alias=code-smart` |
 
+## Latest Verification
+
+| Check | Status | Notes |
+|---|---|---|
+| `go test ./...` | pass | all packages passed, including `internal/usage` |
+| real provider E2E | pass | Go -> LiteLLM -> Xiaomi MiMo returned `200`, `route_reason`, `context_report`, and usage tokens |
+| usage JSONL inspection | pass | record included task id, request id, model alias, returned model, route reason, latency, token usage, and success status |
+| `docker compose -f deploy/docker-compose.yml config` | pass | compose syntax and rendered config are valid |
+| full `docker compose up` runtime | pass | Compose started Go + LiteLLM, real provider request returned `200`, and usage JSONL recorded tokens |
+
 ## Non-goals
 
 - No dashboard.

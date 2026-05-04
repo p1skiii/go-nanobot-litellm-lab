@@ -10,7 +10,7 @@ The project starts with LiteLLM instead of a custom gateway. After the local loo
 
 ## Current Milestone
 
-M4 Custom PolicyRouter completed. M5 UsageLogger + Docker Compose is next.
+M5 UsageLogger and Docker Compose runtime verification are complete. The next planned milestone is M6 local lab query loop.
 
 ## Local Commands
 
@@ -41,7 +41,7 @@ HTTP client
 | M2 | done | real provider-backed LiteLLM behavior study |
 | M3 | done | deterministic ContextManager with `context_report` |
 | M4 | done | score-based PolicyRouter with `route_reason` |
-| M5 | next | task-level UsageLogger and Compose loop |
+| M5 | done | task-level UsageLogger, real provider E2E, and Docker Compose runtime E2E |
 
 ## Project Harness
 

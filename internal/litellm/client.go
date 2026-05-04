@@ -39,6 +39,13 @@ type ReviewResponse struct {
 	Result    string
 	Model     string
 	LatencyMS int64
+	Usage     Usage
+}
+
+type Usage struct {
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
 }
 
 type ErrorKind string
@@ -179,6 +186,7 @@ func (c *Client) ReviewDiff(ctx context.Context, req ReviewRequest) (ReviewRespo
 		Result:    decoded.Choices[0].Message.Content,
 		Model:     decoded.Model,
 		LatencyMS: time.Since(start).Milliseconds(),
+		Usage:     decoded.Usage.toPublic(),
 	}, nil
 }
 
@@ -214,4 +222,19 @@ type chatCompletionResponse struct {
 	Choices []struct {
 		Message message `json:"message"`
 	} `json:"choices"`
+	Usage chatUsage `json:"usage"`
+}
+
+type chatUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+func (u chatUsage) toPublic() Usage {
+	return Usage{
+		PromptTokens:     u.PromptTokens,
+		CompletionTokens: u.CompletionTokens,
+		TotalTokens:      u.TotalTokens,
+	}
 }

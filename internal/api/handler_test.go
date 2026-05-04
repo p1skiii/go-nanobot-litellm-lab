@@ -14,6 +14,7 @@ import (
 	"go-nanobot-litellm-lab/internal/litellm"
 	"go-nanobot-litellm-lab/internal/router"
 	"go-nanobot-litellm-lab/internal/tasks"
+	"go-nanobot-litellm-lab/internal/usage"
 )
 
 func TestHealth(t *testing.T) {
@@ -66,14 +67,16 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 			Result:    "review result",
 			Model:     "code-cheap",
 			LatencyMS: 25,
+			Usage:     litellm.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
 		},
 	}
+	usageLogger := &fakeUsageLogger{}
 	body := stringsReader(`{"diff":"diff --git a/a.go b/a.go","repo_summary":"Go service","stream":false}`)
 	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", body)
 	req.Header.Set("X-Request-ID", "req-test")
 	rec := httptest.NewRecorder()
 
-	NewHandler(Options{Store: store, Reviewer: reviewer, RequestTimeout: time.Second}).ServeHTTP(rec, req)
+	NewHandler(Options{Store: store, Reviewer: reviewer, UsageLogger: usageLogger, RequestTimeout: time.Second}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
@@ -120,6 +123,22 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 	}
 	if strings.TrimSpace(reviewer.req.FinalContext) == "" {
 		t.Fatalf("reviewer final context is empty")
+	}
+	if len(usageLogger.records) != 1 {
+		t.Fatalf("usage records = %d, want 1", len(usageLogger.records))
+	}
+	record := usageLogger.records[0]
+	if record.TaskID != resp.TaskID {
+		t.Fatalf("usage task id = %q, want %q", record.TaskID, resp.TaskID)
+	}
+	if record.ModelAlias != "code-cheap" {
+		t.Fatalf("usage model alias = %q, want code-cheap", record.ModelAlias)
+	}
+	if record.ReturnedModel != "code-cheap" {
+		t.Fatalf("usage returned model = %q, want code-cheap", record.ReturnedModel)
+	}
+	if record.TotalTokens != 15 {
+		t.Fatalf("usage total tokens = %d, want 15", record.TotalTokens)
 	}
 }
 
@@ -189,11 +208,39 @@ func TestReviewDiffMapsTimeoutTo504(t *testing.T) {
 func TestReviewDiffMapsDownstreamErrorTo502(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff"}`))
 	rec := httptest.NewRecorder()
+	usageLogger := &fakeUsageLogger{}
 
-	NewHandler(Options{Reviewer: &fakeReviewer{err: &litellm.Error{Kind: litellm.KindDownstream, Err: errors.New("downstream failed")}}}).ServeHTTP(rec, req)
+	NewHandler(Options{Reviewer: &fakeReviewer{err: &litellm.Error{Kind: litellm.KindDownstream, Err: errors.New("downstream failed")}}, UsageLogger: usageLogger}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("status = %d, want 502; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(usageLogger.records) != 1 {
+		t.Fatalf("usage records = %d, want 1", len(usageLogger.records))
+	}
+	if usageLogger.records[0].Status != string(tasks.StatusFailed) {
+		t.Fatalf("usage status = %q, want failed", usageLogger.records[0].Status)
+	}
+	if usageLogger.records[0].Error == "" {
+		t.Fatalf("usage error is empty")
+	}
+}
+
+func TestReviewDiffUsageWriteFailureDoesNotFailTask(t *testing.T) {
+	reviewer := &fakeReviewer{
+		resp: litellm.ReviewResponse{
+			Result:    "review result",
+			Model:     "code-cheap",
+			LatencyMS: 25,
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff"}`))
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Reviewer: reviewer, UsageLogger: &fakeUsageLogger{err: errors.New("write failed")}}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -312,6 +359,16 @@ func (f *fakePolicyRouter) Route(_ router.Input) (router.Decision, error) {
 		f.decision.RouteReason = "task=review_diff context_chars=10 budget=balanced selected=code-cheap score=0.780"
 	}
 	return f.decision, nil
+}
+
+type fakeUsageLogger struct {
+	records []usage.Record
+	err     error
+}
+
+func (f *fakeUsageLogger) Log(record usage.Record) error {
+	f.records = append(f.records, record)
+	return f.err
 }
 
 func stringsReader(s string) *strings.Reader {
