@@ -25,6 +25,18 @@ Convert raw task input into context blocks and decide keep/compress/drop.
 }
 ```
 
+API response field:
+
+```json
+{
+  "context_report": {
+    "kept_blocks": ["current_diff", "repo_summary"],
+    "compressed_blocks": ["old_plan", "old_logs"],
+    "dropped_blocks": ["irrelevant_notes"]
+  }
+}
+```
+
 ## Data Structures
 
 | Type | Example | Default action |
@@ -35,6 +47,14 @@ Convert raw task input into context blocks and decide keep/compress/drop.
 | `old_logs` | long logs | compress/drop |
 | `irrelevant_notes` | stale discussion | drop |
 
+Current deterministic rules:
+
+- `current_diff` is kept.
+- `repo_summary` is kept, capped if it exceeds the summary budget.
+- `old_plan` is compressed into a one-line capped summary.
+- `old_logs` keeps important error lines first, otherwise keeps recent tail lines.
+- `irrelevant_notes` is dropped.
+
 ## Error Cases
 
 | Case | Expected |
@@ -44,7 +64,7 @@ Convert raw task input into context blocks and decide keep/compress/drop.
 
 ## Config
 
-M3 may add context budgets and block rules under `configs/policies.yaml`.
+M3 uses code defaults for budgets. Context default actions remain documented in `configs/policies.yaml`.
 
 ## Test Matrix
 
@@ -53,9 +73,13 @@ M3 may add context budgets and block rules under `configs/policies.yaml`.
 | current diff kept | pass |
 | repo summary kept | pass |
 | old plan compressed | pass |
+| old logs compressed | pass |
 | irrelevant notes dropped | pass |
+| no usable context rejected | pass |
+| API passes final context to LiteLLM client | pass |
 
 ## Non-goals
 
 - No semantic vector search in M3.
 - No model-generated compression until deterministic rules exist.
+- No persistence of full context reports in task store yet.

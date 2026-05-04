@@ -15,6 +15,8 @@ The purpose is to learn LLM gateway usage first, then gradually implement select
 ```text
 CLI / HTTP client
   -> Go Nanobot Backend
+  -> ContextManager
+  -> PolicyRouter
   -> LiteLLM Proxy
   -> LLM provider or mock provider
 ```
@@ -62,5 +64,6 @@ docker compose -f deploy/docker-compose.yml up
 ## Required After Code Changes
 
 - Run `go test ./...`.
+- Run a real provider end-to-end smoke test after completing each milestone target.
 - Update `docs/current-state.md`.
 - Update `docs/ci-status.md` if tests change.

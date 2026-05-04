@@ -26,13 +26,23 @@ M5 should expose a reviewable task-level usage record. Storage can begin as appe
   "request_id": "string",
   "model_alias": "code-cheap",
   "returned_model": "provider/model",
+  "route_reason": "string",
   "latency_ms": 1234,
-  "input_tokens": 100,
-  "output_tokens": 50,
+  "prompt_tokens": 100,
+  "completion_tokens": 50,
+  "total_tokens": 150,
   "estimated_cost_usd": 0.001,
-  "route_reason": "string"
+  "status": "success|failed",
+  "error": "string optional",
+  "created_at": "RFC3339 timestamp"
 }
 ```
+
+Storage:
+
+- Use append-only local JSONL first, for example `data/usage.jsonl`.
+- The directory should be configurable.
+- The usage log must be reviewable with standard shell tools.
 
 ## Error Cases
 
@@ -46,17 +56,27 @@ M5 should expose a reviewable task-level usage record. Storage can begin as appe
 
 Cost mapping may come from LiteLLM first. Custom cost tables should not be added until M5 proves what fields LiteLLM returns.
 
+Recommended config:
+
+| Name | Default | Purpose |
+|---|---|---|
+| `NANOBOT_USAGE_LOG_PATH` | `data/usage.jsonl` | append-only usage record path |
+
 ## Test Matrix
 
 | Test | Expected |
 |---|---|
 | records task id and latency | pass |
 | records returned model | pass |
+| records selected model alias and route reason | pass |
 | handles missing usage | pass |
 | usage write failure does not fail task | pass |
+| failed LiteLLM call records failure state | pass |
+| real provider smoke writes a usage record | pass |
 
 ## Non-goals
 
 - No billing product.
 - No dashboard in M5.
 - No database until append-only local records prove insufficient.
+- No custom gateway accounting replacement yet.

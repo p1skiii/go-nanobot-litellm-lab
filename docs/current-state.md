@@ -37,6 +37,7 @@ M4 Custom PolicyRouter
 - M3 API response now includes `context_report` block decisions
 - M3 tests added for ContextManager and API/LiteLLM context wiring
 - M3 `go test ./...` passed
+- M3 committed as `fe19623`
 - M4 PolicyRouter implemented with deterministic score-based model selection
 - M4 router reads model profiles from `configs/models.yaml`
 - M4 router reads weights/default fallback from `configs/policies.yaml`
@@ -44,6 +45,10 @@ M4 Custom PolicyRouter
 - M4 response now includes `route_reason`
 - M4 tests added for router scoring, stream filtering, and context-limit rejection
 - M4 `go test ./...` passed
+- M4 real provider smoke passed for `budget_hint=high_quality` -> `code-smart`
+- M4 real provider smoke passed for `budget_hint=low` -> `code-cheap`
+- M4 committed as `4931ac4`
+- M1-M4 documentation sync completed in proposal `docs/proposals/0001-sync-m1-m4-docs-and-prepare-m5.md`
 
 ## In Progress
 
@@ -55,4 +60,4 @@ M4 Custom PolicyRouter
 
 ## Next Step
 
-Run a real-provider M4 smoke test to verify routed alias behavior end-to-end, then start M5 UsageLogger + Docker Compose.
+Start M5 UsageLogger + Docker Compose using `docs/specs/0005-usage-logger.md` and `docs/test-plans/0005-usage-logger-test-plan.md`.

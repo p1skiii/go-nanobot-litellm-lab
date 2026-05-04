@@ -25,8 +25,16 @@
 | review task receives task id | pass |
 | task result can be fetched | pass |
 
+## M3-M4 Additions
+
+| Test | Expected |
+|---|---|
+| context report returned | pass |
+| route reason returned | pass |
+| selected model alias returned | pass |
+
 ## Current Gaps
 
-- No `/tasks/review-diff` implementation in M0.
-- No persistence in M0.
-- No LiteLLM integration in M0.
+- No durable persistence yet.
+- No streaming endpoint yet.
+- No usage log yet.

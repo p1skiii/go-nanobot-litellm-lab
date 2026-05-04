@@ -25,6 +25,15 @@ Choose a LiteLLM model alias based on task features, budget hints, and model pro
 }
 ```
 
+API response field:
+
+```json
+{
+  "model": "code-smart",
+  "route_reason": "task=review_diff context_chars=108 budget=high_quality selected=code-smart score=1.065"
+}
+```
+
 ## Data Structures
 
 ```json
@@ -42,14 +51,24 @@ Choose a LiteLLM model alias based on task features, budget hints, and model pro
 
 | Case | Expected |
 |---|---|
-| no matching model | deterministic config error |
-| stream requested but unsupported | choose supported fallback or reject |
+| no matching model | return 400 before LiteLLM call |
+| stream requested but unsupported | choose supported model or reject |
 | context exceeds all limits | reject before LiteLLM call |
 
 ## Config
 
 - `configs/models.yaml` defines model profiles.
 - `configs/policies.yaml` defines scoring weights and fallback chains.
+- `NANOBOT_MODELS_CONFIG` can override the models config path.
+- `NANOBOT_POLICIES_CONFIG` can override the policies config path.
+
+Current routing behavior:
+
+- `budget_hint=high_quality` favors quality and selects `code-smart` with the default config.
+- `budget_hint=low` favors lower cost and selects `code-cheap` with the default config.
+- `context_chars` filters out models whose `context_limit` is too small.
+- `stream=true` is still rejected by the API before routing because streaming has no public contract yet.
+- The selected alias is passed to LiteLLM as the chat completion `model`.
 
 ## Test Matrix
 
@@ -58,7 +77,10 @@ Choose a LiteLLM model alias based on task features, budget hints, and model pro
 | high quality review selects smart model | pass |
 | low budget task selects cheap model | pass |
 | stream requirement filters unsupported models | pass |
+| context too large rejects before LiteLLM | pass |
+| config files load | pass |
 | route reason is populated | pass |
+| real provider smoke routes high quality to `code-smart` and low budget to `code-cheap` | pass |
 
 ## Non-goals
 

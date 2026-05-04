@@ -10,7 +10,7 @@ The project starts with LiteLLM instead of a custom gateway. After the local loo
 
 ## Current Milestone
 
-M0 Harness Ready.
+M4 Custom PolicyRouter completed. M5 UsageLogger + Docker Compose is next.
 
 ## Local Commands
 
@@ -20,6 +20,28 @@ go run ./cmd/server
 curl http://localhost:8080/health
 docker compose -f deploy/docker-compose.yml config
 ```
+
+## Current Runtime Chain
+
+```text
+HTTP client
+  -> Go Nanobot Backend
+  -> ContextManager
+  -> PolicyRouter
+  -> LiteLLM Proxy
+  -> LLM provider or mock provider
+```
+
+## Implemented Milestones
+
+| Milestone | Status | Summary |
+|---|---|---|
+| M0 | done | filesystem harness and minimal server |
+| M1 | done | `POST /tasks/review-diff`, task store, non-stream LiteLLM client |
+| M2 | done | real provider-backed LiteLLM behavior study |
+| M3 | done | deterministic ContextManager with `context_report` |
+| M4 | done | score-based PolicyRouter with `route_reason` |
+| M5 | next | task-level UsageLogger and Compose loop |
 
 ## Project Harness
 

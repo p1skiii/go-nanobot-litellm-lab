@@ -2,8 +2,8 @@
 
 ## Last Run
 
-Date: 2026-05-04 12:12:45 CST
-Commit: working tree on base `7cd6c0b`
+Date: 2026-05-04 12:28:29 CST
+Commit: working tree on base `4931ac4`
 
 ## Commands
 
@@ -47,6 +47,11 @@ Commit: working tree on base `7cd6c0b`
 | `go get gopkg.in/yaml.v3` | pass | added YAML parser for policy/model config loading |
 | `gofmt -w cmd/server/main.go internal/api/handler.go internal/api/handler_test.go internal/config/config.go internal/config/config_test.go internal/litellm/client.go internal/litellm/client_test.go internal/router/router.go internal/router/router_test.go internal/tasks/store.go internal/tasks/store_test.go` | pass | formatted M4 router and integration changes |
 | `go test ./...` | pass | M4 router tests and updated API/LiteLLM/config/task tests passed |
+| M4 real provider smoke: `budget_hint=high_quality` | pass | Go -> LiteLLM -> Xiaomi MiMo returned `200`, `model=code-smart`, and `route_reason` selected `code-smart` |
+| M4 real provider smoke: `budget_hint=low` | pass | Go -> LiteLLM -> Xiaomi MiMo returned `200`, `model=code-cheap`, and `route_reason` selected `code-cheap` |
+| M1-M4 documentation sync | pass | proposal, milestone summary, specs, test plans, roadmap, README, and harness rule updated |
+| `go test ./...` after documentation sync | pass | all packages passed |
+| documentation sync real provider smoke | pass | Go -> LiteLLM -> Xiaomi MiMo returned `200`, `model=code-smart`, `route_reason`, and `context_report` |
 
 ## Known Failures
 
