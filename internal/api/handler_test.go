@@ -172,6 +172,75 @@ func TestGetTask(t *testing.T) {
 	}
 }
 
+func TestGetRecentUsage(t *testing.T) {
+	reader := &fakeUsageReader{
+		recent: []usage.Record{
+			{TaskID: "task_1", Status: "success"},
+			{TaskID: "task_2", Status: "failed"},
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/usage/recent?limit=2", nil)
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{UsageReader: reader}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if reader.limit != 2 {
+		t.Fatalf("limit = %d, want 2", reader.limit)
+	}
+
+	var resp usageListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Count != 2 {
+		t.Fatalf("count = %d, want 2", resp.Count)
+	}
+}
+
+func TestGetRecentUsageRejectsInvalidLimit(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/usage/recent?limit=bad", nil)
+	rec := httptest.NewRecorder()
+
+	NewHandler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestGetUsageByTask(t *testing.T) {
+	reader := &fakeUsageReader{
+		byTask: []usage.Record{
+			{TaskID: "task_test", Status: "success"},
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/usage/tasks/task_test", nil)
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{UsageReader: reader}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if reader.taskID != "task_test" {
+		t.Fatalf("task id = %q, want task_test", reader.taskID)
+	}
+
+	var resp usageListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.TaskID != "task_test" {
+		t.Fatalf("response task id = %q, want task_test", resp.TaskID)
+	}
+	if resp.Count != 1 {
+		t.Fatalf("count = %d, want 1", resp.Count)
+	}
+}
+
 func TestReviewDiffRejectsEmptyDiff(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"  "}`))
 	rec := httptest.NewRecorder()
@@ -369,6 +438,24 @@ type fakeUsageLogger struct {
 func (f *fakeUsageLogger) Log(record usage.Record) error {
 	f.records = append(f.records, record)
 	return f.err
+}
+
+type fakeUsageReader struct {
+	recent []usage.Record
+	byTask []usage.Record
+	limit  int
+	taskID string
+	err    error
+}
+
+func (f *fakeUsageReader) Recent(limit int) ([]usage.Record, error) {
+	f.limit = limit
+	return f.recent, f.err
+}
+
+func (f *fakeUsageReader) ForTask(taskID string) ([]usage.Record, error) {
+	f.taskID = taskID
+	return f.byTask, f.err
 }
 
 func stringsReader(s string) *strings.Reader {

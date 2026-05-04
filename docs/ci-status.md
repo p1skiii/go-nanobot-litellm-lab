@@ -2,7 +2,7 @@
 
 ## Last Run
 
-Date: 2026-05-05 00:11:10 CST
+Date: 2026-05-05 00:15:52 CST
 Commit: working tree on base `729ec36`
 
 ## Commands
@@ -67,6 +67,10 @@ Commit: working tree on base `729ec36`
 | M5 Docker Compose runtime E2E | pass | Go container -> LiteLLM container -> Xiaomi MiMo returned `200`, `model=code-cheap`, `context_report`, and `route_reason` |
 | M5 Docker Compose usage JSONL verification | pass | `data/usage.jsonl` recorded model alias, returned model, route reason, latency, prompt/completion/total tokens, and success status |
 | `go test ./...` after M5 Compose verification | pass | all packages passed |
+| `gofmt -w internal/api/handler.go internal/api/handler_test.go internal/usage/logger.go internal/usage/logger_test.go` | pass | formatted M6 API and usage reader changes |
+| `go test ./...` for M6 | pass | all packages passed, including usage reader and usage API tests |
+| Compose rebuild with M6 binary | pass | local linux/arm64 nanobot binary copied into scratch image and container restarted |
+| `scripts/smoke-real-provider.sh` | pass | Docker Compose Go -> LiteLLM -> Xiaomi MiMo returned `200`; `/tasks/{id}`, `/usage/tasks/{id}`, and `/usage/recent` returned expected records |
 
 ## Known Failures
 

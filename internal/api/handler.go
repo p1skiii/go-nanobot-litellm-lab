@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,12 +35,18 @@ type UsageLogger interface {
 	Log(record usage.Record) error
 }
 
+type UsageReader interface {
+	Recent(limit int) ([]usage.Record, error)
+	ForTask(taskID string) ([]usage.Record, error)
+}
+
 type Options struct {
 	Store          *tasks.Store
 	Reviewer       Reviewer
 	ContextManager ContextManager
 	PolicyRouter   PolicyRouter
 	UsageLogger    UsageLogger
+	UsageReader    UsageReader
 	RequestTimeout time.Duration
 	Logger         *log.Logger
 }
@@ -50,6 +57,7 @@ type Handler struct {
 	contextManager ContextManager
 	policyRouter   PolicyRouter
 	usageLogger    UsageLogger
+	usageReader    UsageReader
 	requestTimeout time.Duration
 	logger         *log.Logger
 }
@@ -87,6 +95,12 @@ type taskResponse struct {
 	ContextReport *contextReport `json:"context_report,omitempty"`
 }
 
+type usageListResponse struct {
+	TaskID  string         `json:"task_id,omitempty"`
+	Count   int            `json:"count"`
+	Records []usage.Record `json:"records"`
+}
+
 func NewHandler(opts ...Options) http.Handler {
 	options := Options{}
 	if len(opts) > 0 {
@@ -107,6 +121,13 @@ func NewHandler(opts ...Options) http.Handler {
 	if options.UsageLogger == nil {
 		options.UsageLogger = usage.NoopLogger{}
 	}
+	if options.UsageReader == nil {
+		if reader, ok := options.UsageLogger.(UsageReader); ok {
+			options.UsageReader = reader
+		} else {
+			options.UsageReader = usage.NoopLogger{}
+		}
+	}
 	if options.Logger == nil {
 		options.Logger = log.Default()
 	}
@@ -117,6 +138,7 @@ func NewHandler(opts ...Options) http.Handler {
 		contextManager: options.ContextManager,
 		policyRouter:   options.PolicyRouter,
 		usageLogger:    options.UsageLogger,
+		usageReader:    options.UsageReader,
 		requestTimeout: options.RequestTimeout,
 		logger:         options.Logger,
 	}
@@ -125,6 +147,8 @@ func NewHandler(opts ...Options) http.Handler {
 	mux.HandleFunc("/health", method(http.MethodGet, health))
 	mux.HandleFunc("/tasks/review-diff", method(http.MethodPost, h.reviewDiff))
 	mux.HandleFunc("/tasks/", method(http.MethodGet, h.getTask))
+	mux.HandleFunc("/usage/recent", method(http.MethodGet, h.getRecentUsage))
+	mux.HandleFunc("/usage/tasks/", method(http.MethodGet, h.getUsageByTask))
 	return mux
 }
 
@@ -285,6 +309,63 @@ func (h *Handler) getTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, responseFromTask(task))
+}
+
+func (h *Handler) getRecentUsage(w http.ResponseWriter, r *http.Request) {
+	limit, ok := parseUsageLimit(r)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid limit")
+		return
+	}
+
+	records, err := h.usageReader.Recent(limit)
+	if err != nil {
+		h.logger.Printf("usage read failed endpoint=recent error=%v", err)
+		writeError(w, http.StatusInternalServerError, "usage read failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, usageListResponse{
+		Count:   len(records),
+		Records: records,
+	})
+}
+
+func (h *Handler) getUsageByTask(w http.ResponseWriter, r *http.Request) {
+	taskID := strings.TrimPrefix(r.URL.Path, "/usage/tasks/")
+	if taskID == "" || strings.Contains(taskID, "/") {
+		writeError(w, http.StatusNotFound, "usage not found")
+		return
+	}
+
+	records, err := h.usageReader.ForTask(taskID)
+	if err != nil {
+		h.logger.Printf("usage read failed endpoint=task task_id=%s error=%v", taskID, err)
+		writeError(w, http.StatusInternalServerError, "usage read failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, usageListResponse{
+		TaskID:  taskID,
+		Count:   len(records),
+		Records: records,
+	})
+}
+
+func parseUsageLimit(r *http.Request) (int, bool) {
+	raw := strings.TrimSpace(r.URL.Query().Get("limit"))
+	if raw == "" {
+		return 20, true
+	}
+
+	limit, err := strconv.Atoi(raw)
+	if err != nil || limit < 1 {
+		return 0, false
+	}
+	if limit > 100 {
+		return 100, true
+	}
+	return limit, true
 }
 
 func requestIDFrom(r *http.Request) string {

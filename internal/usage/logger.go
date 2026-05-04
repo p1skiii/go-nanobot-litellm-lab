@@ -1,10 +1,12 @@
 package usage
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -64,8 +66,80 @@ func (l *JSONLLogger) Log(record Record) error {
 	return nil
 }
 
+func (l *JSONLLogger) Recent(limit int) ([]Record, error) {
+	if limit <= 0 {
+		return []Record{}, nil
+	}
+
+	records, err := readRecords(l.path)
+	if err != nil {
+		return nil, err
+	}
+	if len(records) <= limit {
+		return records, nil
+	}
+	return records[len(records)-limit:], nil
+}
+
+func (l *JSONLLogger) ForTask(taskID string) ([]Record, error) {
+	records, err := readRecords(l.path)
+	if err != nil {
+		return nil, err
+	}
+
+	matches := make([]Record, 0)
+	for _, record := range records {
+		if record.TaskID == taskID {
+			matches = append(matches, record)
+		}
+	}
+	return matches, nil
+}
+
+func readRecords(path string) ([]Record, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []Record{}, nil
+		}
+		return nil, fmt.Errorf("open usage log: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	records := make([]Record, 0)
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		var record Record
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			return nil, fmt.Errorf("decode usage log line %d: %w", lineNo, err)
+		}
+		records = append(records, record)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan usage log: %w", err)
+	}
+	return records, nil
+}
+
 type NoopLogger struct{}
 
 func (NoopLogger) Log(Record) error {
 	return nil
+}
+
+func (NoopLogger) Recent(int) ([]Record, error) {
+	return []Record{}, nil
+}
+
+func (NoopLogger) ForTask(string) ([]Record, error) {
+	return []Record{}, nil
 }

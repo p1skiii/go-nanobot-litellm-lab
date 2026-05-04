@@ -83,7 +83,14 @@ Exit:
 
 ## M6 Local Lab Query Loop
 
-Status: next
+Status: done
+
+Current:
+
+- `GET /usage/recent` returns recent usage records from JSONL.
+- `GET /usage/tasks/{id}` returns usage records for one task id.
+- `scripts/smoke-real-provider.sh` verifies review task, task lookup, task usage lookup, and recent usage lookup.
+- Docker Compose runtime E2E passes with real Xiaomi MiMo provider.
 
 Exit:
 

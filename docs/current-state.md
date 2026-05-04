@@ -62,10 +62,18 @@ M6 Local Lab Query Loop
 - Docker Desktop started and Docker daemon verified
 - M5 Docker Compose runtime E2E passed with real Xiaomi MiMo provider
 - M5 Compose runtime request wrote usage JSONL with model, route, latency, and token usage
+- M5 committed as `a5f0422`
+- M6 proposal/spec/test plan accepted
+- M6 UsageReader implemented for append-only JSONL
+- M6 `GET /usage/recent` implemented
+- M6 `GET /usage/tasks/{id}` implemented
+- M6 smoke script added
+- M6 `go test ./...` passed
+- M6 Docker Compose real provider smoke passed
 
 ## In Progress
 
-- M6 planning
+- none
 
 ## Blocked
 
@@ -73,4 +81,4 @@ M6 Local Lab Query Loop
 
 ## Next Step
 
-Commit M5 UsageLogger, then create M6 proposal/spec/test plan for local usage query loop.
+Review and commit M6 local lab query loop.
