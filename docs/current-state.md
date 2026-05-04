@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-M3 Custom ContextManager
+M4 Custom PolicyRouter
 
 ## Completed
 
@@ -37,6 +37,13 @@ M3 Custom ContextManager
 - M3 API response now includes `context_report` block decisions
 - M3 tests added for ContextManager and API/LiteLLM context wiring
 - M3 `go test ./...` passed
+- M4 PolicyRouter implemented with deterministic score-based model selection
+- M4 router reads model profiles from `configs/models.yaml`
+- M4 router reads weights/default fallback from `configs/policies.yaml`
+- M4 `review-diff` now routes model alias before LiteLLM call
+- M4 response now includes `route_reason`
+- M4 tests added for router scoring, stream filtering, and context-limit rejection
+- M4 `go test ./...` passed
 
 ## In Progress
 
@@ -48,4 +55,4 @@ M3 Custom ContextManager
 
 ## Next Step
 
-Run a real-provider M3 smoke test through LiteLLM and decide whether to start M4 PolicyRouter or first add lightweight LiteLLM metadata capture.
+Run a real-provider M4 smoke test to verify routed alias behavior end-to-end, then start M5 UsageLogger + Docker Compose.

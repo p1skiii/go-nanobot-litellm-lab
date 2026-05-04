@@ -31,6 +31,7 @@ type ReviewRequest struct {
 	Diff         string
 	RepoSummary  string
 	FinalContext string
+	ModelAlias   string
 	RequestID    string
 }
 
@@ -102,9 +103,13 @@ func NewClient(cfg Config) (*Client, error) {
 
 func (c *Client) ReviewDiff(ctx context.Context, req ReviewRequest) (ReviewResponse, error) {
 	start := time.Now()
+	modelAlias := strings.TrimSpace(req.ModelAlias)
+	if modelAlias == "" {
+		modelAlias = c.model
+	}
 
 	payload := chatCompletionRequest{
-		Model: c.model,
+		Model: modelAlias,
 		Messages: []message{
 			{
 				Role:    "system",

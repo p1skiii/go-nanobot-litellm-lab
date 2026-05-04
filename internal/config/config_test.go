@@ -10,6 +10,8 @@ func TestLoadUsesDefaultAddr(t *testing.T) {
 	t.Setenv("LITELLM_BASE_URL", "")
 	t.Setenv("LITELLM_MODEL", "")
 	t.Setenv("LITELLM_TIMEOUT", "")
+	t.Setenv("NANOBOT_MODELS_CONFIG", "")
+	t.Setenv("NANOBOT_POLICIES_CONFIG", "")
 
 	cfg := Load()
 	if cfg.Addr != defaultAddr {
@@ -27,6 +29,12 @@ func TestLoadUsesDefaultAddr(t *testing.T) {
 	if cfg.LiteLLMTimeout != defaultLiteLLMTimeout {
 		t.Fatalf("litellm timeout = %s, want %s", cfg.LiteLLMTimeout, defaultLiteLLMTimeout)
 	}
+	if cfg.ModelsConfigPath != defaultModelsConfigPath {
+		t.Fatalf("models config path = %q, want %q", cfg.ModelsConfigPath, defaultModelsConfigPath)
+	}
+	if cfg.PoliciesConfigPath != defaultPoliciesConfigPath {
+		t.Fatalf("policies config path = %q, want %q", cfg.PoliciesConfigPath, defaultPoliciesConfigPath)
+	}
 }
 
 func TestLoadUsesEnvAddr(t *testing.T) {
@@ -35,6 +43,8 @@ func TestLoadUsesEnvAddr(t *testing.T) {
 	t.Setenv("LITELLM_API_KEY", "sk-test")
 	t.Setenv("LITELLM_MODEL", "code-smart")
 	t.Setenv("LITELLM_TIMEOUT", "2s")
+	t.Setenv("NANOBOT_MODELS_CONFIG", "/tmp/models.yaml")
+	t.Setenv("NANOBOT_POLICIES_CONFIG", "/tmp/policies.yaml")
 
 	cfg := Load()
 	if cfg.Addr != ":18080" {
@@ -55,5 +65,11 @@ func TestLoadUsesEnvAddr(t *testing.T) {
 
 	if cfg.LiteLLMTimeout != 2*time.Second {
 		t.Fatalf("litellm timeout = %s, want 2s", cfg.LiteLLMTimeout)
+	}
+	if cfg.ModelsConfigPath != "/tmp/models.yaml" {
+		t.Fatalf("models config path = %q, want /tmp/models.yaml", cfg.ModelsConfigPath)
+	}
+	if cfg.PoliciesConfigPath != "/tmp/policies.yaml" {
+		t.Fatalf("policies config path = %q, want /tmp/policies.yaml", cfg.PoliciesConfigPath)
 	}
 }

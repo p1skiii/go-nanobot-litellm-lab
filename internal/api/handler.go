@@ -11,6 +11,7 @@ import (
 
 	"go-nanobot-litellm-lab/internal/contextmgr"
 	"go-nanobot-litellm-lab/internal/litellm"
+	"go-nanobot-litellm-lab/internal/router"
 	"go-nanobot-litellm-lab/internal/tasks"
 )
 
@@ -24,10 +25,15 @@ type ContextManager interface {
 	Build(input contextmgr.Input) (contextmgr.Output, error)
 }
 
+type PolicyRouter interface {
+	Route(input router.Input) (router.Decision, error)
+}
+
 type Options struct {
 	Store          *tasks.Store
 	Reviewer       Reviewer
 	ContextManager ContextManager
+	PolicyRouter   PolicyRouter
 	RequestTimeout time.Duration
 	Logger         *log.Logger
 }
@@ -36,6 +42,7 @@ type Handler struct {
 	store          *tasks.Store
 	reviewer       Reviewer
 	contextManager ContextManager
+	policyRouter   PolicyRouter
 	requestTimeout time.Duration
 	logger         *log.Logger
 }
@@ -51,6 +58,7 @@ type reviewDiffRequest struct {
 	PriorPlan   string `json:"prior_plan"`
 	Logs        string `json:"logs"`
 	Notes       string `json:"notes"`
+	BudgetHint  string `json:"budget_hint"`
 	Stream      bool   `json:"stream"`
 }
 
@@ -66,6 +74,7 @@ type taskResponse struct {
 	Status        string         `json:"status"`
 	Result        string         `json:"result,omitempty"`
 	Model         string         `json:"model,omitempty"`
+	RouteReason   string         `json:"route_reason,omitempty"`
 	LatencyMS     int64          `json:"latency_ms"`
 	Error         string         `json:"error,omitempty"`
 	ContextReport *contextReport `json:"context_report,omitempty"`
@@ -85,6 +94,9 @@ func NewHandler(opts ...Options) http.Handler {
 	if options.ContextManager == nil {
 		options.ContextManager = contextmgr.NewManager(contextmgr.Config{})
 	}
+	if options.PolicyRouter == nil {
+		options.PolicyRouter = router.NewDefault()
+	}
 	if options.Logger == nil {
 		options.Logger = log.Default()
 	}
@@ -93,6 +105,7 @@ func NewHandler(opts ...Options) http.Handler {
 		store:          options.Store,
 		reviewer:       options.Reviewer,
 		contextManager: options.ContextManager,
+		policyRouter:   options.PolicyRouter,
 		requestTimeout: options.RequestTimeout,
 		logger:         options.Logger,
 	}
@@ -170,6 +183,16 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 		CompressedBlocks: contextOut.CompressedBlocks,
 		DroppedBlocks:    contextOut.DroppedBlocks,
 	}
+	decision, err := h.policyRouter.Route(router.Input{
+		TaskType:        "review_diff",
+		ContextChars:    len(contextOut.FinalContext),
+		StreamRequested: req.Stream,
+		BudgetHint:      req.BudgetHint,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "no routable model")
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.requestTimeout)
 	defer cancel()
@@ -178,17 +201,20 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 		Diff:         req.Diff,
 		RepoSummary:  req.RepoSummary,
 		FinalContext: contextOut.FinalContext,
+		ModelAlias:   decision.ModelAlias,
 		RequestID:    requestID,
 	})
 	if err != nil {
 		statusCode := mapLiteLLMError(err)
 		task := h.store.Save(tasks.Task{
-			ID:        taskID,
-			RequestID: requestID,
-			Status:    tasks.StatusFailed,
-			Error:     err.Error(),
+			ID:          taskID,
+			RequestID:   requestID,
+			Status:      tasks.StatusFailed,
+			Model:       decision.ModelAlias,
+			RouteReason: decision.RouteReason,
+			Error:       err.Error(),
 		})
-		h.logger.Printf("review_diff failed task_id=%s request_id=%s status=%d error=%v", taskID, requestID, statusCode, err)
+		h.logger.Printf("review_diff failed task_id=%s request_id=%s status=%d model=%s route_reason=%q error=%v", taskID, requestID, statusCode, decision.ModelAlias, decision.RouteReason, err)
 		resp := responseFromTask(task)
 		resp.ContextReport = &report
 		writeJSON(w, statusCode, resp)
@@ -196,15 +222,16 @@ func (h *Handler) reviewDiff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	task := h.store.Save(tasks.Task{
-		ID:        taskID,
-		RequestID: requestID,
-		Status:    tasks.StatusSuccess,
-		Result:    resp.Result,
-		Model:     resp.Model,
-		LatencyMS: resp.LatencyMS,
+		ID:          taskID,
+		RequestID:   requestID,
+		Status:      tasks.StatusSuccess,
+		Result:      resp.Result,
+		Model:       decision.ModelAlias,
+		RouteReason: decision.RouteReason,
+		LatencyMS:   resp.LatencyMS,
 	})
 
-	h.logger.Printf("review_diff success task_id=%s request_id=%s model=%s latency_ms=%d", taskID, requestID, resp.Model, resp.LatencyMS)
+	h.logger.Printf("review_diff success task_id=%s request_id=%s model=%s route_reason=%q latency_ms=%d", taskID, requestID, decision.ModelAlias, decision.RouteReason, resp.LatencyMS)
 	response := responseFromTask(task)
 	response.ContextReport = &report
 	writeJSON(w, http.StatusOK, response)
@@ -243,13 +270,14 @@ func mapLiteLLMError(err error) int {
 
 func responseFromTask(task tasks.Task) taskResponse {
 	return taskResponse{
-		TaskID:    task.ID,
-		RequestID: task.RequestID,
-		Status:    string(task.Status),
-		Result:    task.Result,
-		Model:     task.Model,
-		LatencyMS: task.LatencyMS,
-		Error:     task.Error,
+		TaskID:      task.ID,
+		RequestID:   task.RequestID,
+		Status:      string(task.Status),
+		Result:      task.Result,
+		Model:       task.Model,
+		RouteReason: task.RouteReason,
+		LatencyMS:   task.LatencyMS,
+		Error:       task.Error,
 	}
 }
 

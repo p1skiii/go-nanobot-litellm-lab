@@ -16,15 +16,16 @@ const (
 )
 
 type Task struct {
-	ID        string
-	RequestID string
-	Status    Status
-	Result    string
-	Model     string
-	Error     string
-	LatencyMS int64
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          string
+	RequestID   string
+	Status      Status
+	Result      string
+	Model       string
+	RouteReason string
+	Error       string
+	LatencyMS   int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type Store struct {

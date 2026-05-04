@@ -13,6 +13,7 @@ import (
 	"go-nanobot-litellm-lab/internal/api"
 	"go-nanobot-litellm-lab/internal/config"
 	"go-nanobot-litellm-lab/internal/litellm"
+	"go-nanobot-litellm-lab/internal/router"
 	"go-nanobot-litellm-lab/internal/tasks"
 )
 
@@ -28,10 +29,14 @@ func main() {
 	if err != nil {
 		logger.Fatalf("litellm client config failed: %v", err)
 	}
+	policyRouter, err := router.NewFromFiles(cfg.ModelsConfigPath, cfg.PoliciesConfigPath)
+	if err != nil {
+		logger.Fatalf("policy router config failed: %v", err)
+	}
 
 	server := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewHandler(api.Options{Store: tasks.NewStore(), Reviewer: reviewer, RequestTimeout: cfg.LiteLLMTimeout, Logger: logger}),
+		Handler:           api.NewHandler(api.Options{Store: tasks.NewStore(), Reviewer: reviewer, PolicyRouter: policyRouter, RequestTimeout: cfg.LiteLLMTimeout, Logger: logger}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

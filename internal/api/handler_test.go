@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"go-nanobot-litellm-lab/internal/litellm"
+	"go-nanobot-litellm-lab/internal/router"
 	"go-nanobot-litellm-lab/internal/tasks"
 )
 
@@ -94,6 +95,9 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 	if resp.Result != "review result" {
 		t.Fatalf("result = %q, want review result", resp.Result)
 	}
+	if strings.TrimSpace(resp.RouteReason) == "" {
+		t.Fatalf("route reason is empty")
+	}
 	if resp.ContextReport == nil {
 		t.Fatalf("context report is nil")
 	}
@@ -111,6 +115,9 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 	if reviewer.req.RequestID != "req-test" {
 		t.Fatalf("reviewer request id = %q, want req-test", reviewer.req.RequestID)
 	}
+	if reviewer.req.ModelAlias != "code-cheap" {
+		t.Fatalf("reviewer model alias = %q, want code-cheap", reviewer.req.ModelAlias)
+	}
 	if strings.TrimSpace(reviewer.req.FinalContext) == "" {
 		t.Fatalf("reviewer final context is empty")
 	}
@@ -119,12 +126,13 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 func TestGetTask(t *testing.T) {
 	store := tasks.NewStore()
 	store.Save(tasks.Task{
-		ID:        "task_test",
-		RequestID: "req_test",
-		Status:    tasks.StatusSuccess,
-		Result:    "ok",
-		Model:     "code-cheap",
-		LatencyMS: 10,
+		ID:          "task_test",
+		RequestID:   "req_test",
+		Status:      tasks.StatusSuccess,
+		Result:      "ok",
+		Model:       "code-cheap",
+		RouteReason: "task=review_diff selected=code-cheap",
+		LatencyMS:   10,
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/tasks/task_test", nil)
@@ -186,6 +194,42 @@ func TestReviewDiffMapsDownstreamErrorTo502(t *testing.T) {
 
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("status = %d, want 502; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestReviewDiffHighQualityBudgetRoutesToSmartModel(t *testing.T) {
+	store := tasks.NewStore()
+	reviewer := &fakeReviewer{
+		resp: litellm.ReviewResponse{
+			Result:    "routed review result",
+			Model:     "code-smart",
+			LatencyMS: 20,
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff","budget_hint":"high_quality"}`))
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Store: store, Reviewer: reviewer, RequestTimeout: time.Second}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if reviewer.req.ModelAlias != "code-smart" {
+		t.Fatalf("reviewer model alias = %q, want code-smart", reviewer.req.ModelAlias)
+	}
+}
+
+func TestReviewDiffReturns400WhenNoRoutableModel(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff"}`))
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{
+		Reviewer:     &fakeReviewer{},
+		PolicyRouter: &fakePolicyRouter{err: errors.New("no route")},
+	}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -252,6 +296,22 @@ type fakeReviewer struct {
 func (f *fakeReviewer) ReviewDiff(_ context.Context, req litellm.ReviewRequest) (litellm.ReviewResponse, error) {
 	f.req = req
 	return f.resp, f.err
+}
+
+type fakePolicyRouter struct {
+	decision router.Decision
+	err      error
+}
+
+func (f *fakePolicyRouter) Route(_ router.Input) (router.Decision, error) {
+	if f.err != nil {
+		return router.Decision{}, f.err
+	}
+	if f.decision.ModelAlias == "" {
+		f.decision.ModelAlias = "code-cheap"
+		f.decision.RouteReason = "task=review_diff context_chars=10 budget=balanced selected=code-cheap score=0.780"
+	}
+	return f.decision, nil
 }
 
 func stringsReader(s string) *strings.Reader {

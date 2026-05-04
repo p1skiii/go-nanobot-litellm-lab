@@ -5,12 +5,13 @@ import "testing"
 func TestStoreSavesAndGetsTask(t *testing.T) {
 	store := NewStore()
 	task := Task{
-		ID:        "task_test",
-		RequestID: "req_test",
-		Status:    StatusSuccess,
-		Result:    "ok",
-		Model:     "code-cheap",
-		LatencyMS: 12,
+		ID:          "task_test",
+		RequestID:   "req_test",
+		Status:      StatusSuccess,
+		Result:      "ok",
+		Model:       "code-cheap",
+		RouteReason: "task=review_diff selected=code-cheap",
+		LatencyMS:   12,
 	}
 
 	saved := store.Save(task)

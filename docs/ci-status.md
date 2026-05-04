@@ -2,7 +2,7 @@
 
 ## Last Run
 
-Date: 2026-05-04 00:39:54 CST
+Date: 2026-05-04 12:12:45 CST
 Commit: working tree on base `7cd6c0b`
 
 ## Commands
@@ -44,6 +44,9 @@ Commit: working tree on base `7cd6c0b`
 | `NANOBOT_ADDR=:18084 LITELLM_BASE_URL=http://127.0.0.1:4101 LITELLM_API_KEY=sk-local-dev LITELLM_MODEL=mimo-real-flash LITELLM_TIMEOUT=40s go run ./cmd/server` | pass | Go server started for M3 smoke |
 | `curl -X POST http://127.0.0.1:18084/tasks/review-diff` with `prior_plan/logs/notes` | pass | returned `200`, real model output, and `context_report` with keep/compress/drop decisions |
 | stop temporary LiteLLM + Go processes | pass | test processes terminated cleanly |
+| `go get gopkg.in/yaml.v3` | pass | added YAML parser for policy/model config loading |
+| `gofmt -w cmd/server/main.go internal/api/handler.go internal/api/handler_test.go internal/config/config.go internal/config/config_test.go internal/litellm/client.go internal/litellm/client_test.go internal/router/router.go internal/router/router_test.go internal/tasks/store.go internal/tasks/store_test.go` | pass | formatted M4 router and integration changes |
+| `go test ./...` | pass | M4 router tests and updated API/LiteLLM/config/task tests passed |
 
 ## Known Failures
 
