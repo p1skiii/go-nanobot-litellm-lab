@@ -99,3 +99,25 @@ Exit:
 - local smoke script demonstrates review task -> task lookup -> usage lookup
 - Docker Compose runtime E2E passes
 - real provider E2E passes after implementation
+
+## M7 Failure Replay Lab
+
+Status: done
+
+Current:
+
+- `scripts/smoke-failure-cases.sh` replays expected failure cases.
+- Empty diff maps to `400`.
+- Streaming request maps to `400`.
+- Tiny LiteLLM timeout maps to `504` and writes failed usage.
+- Missing LiteLLM model maps to `502` and writes failed usage.
+- Normal real-provider request succeeds after failure cases.
+
+Exit:
+
+- empty diff failure is replayable and maps to `400`
+- streaming request failure is replayable and maps to `400`
+- tiny LiteLLM timeout is replayable and maps to `504`
+- missing LiteLLM model error is replayable and maps to `502`
+- failed usage records are written for timeout and downstream error cases
+- normal real-provider request succeeds after failure cases

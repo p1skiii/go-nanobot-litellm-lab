@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-M6 Local Lab Query Loop
+M7 Failure Replay Lab
 
 ## Completed
 
@@ -70,6 +70,13 @@ M6 Local Lab Query Loop
 - M6 smoke script added
 - M6 `go test ./...` passed
 - M6 Docker Compose real provider smoke passed
+- M6 committed as `1bb5658`
+- M6 pushed to `origin/main`
+- M7 proposal/spec/test plan accepted
+- M7 failure replay script added
+- M7 `go test ./...` passed
+- M7 failure replay smoke passed against Docker Compose LiteLLM and real Xiaomi MiMo recovery path
+- M7 behavior notes updated with timeout, missing model, validation, and recovery observations
 
 ## In Progress
 
@@ -81,4 +88,4 @@ M6 Local Lab Query Loop
 
 ## Next Step
 
-Review and commit M6 local lab query loop.
+Review and commit M7 failure replay lab.

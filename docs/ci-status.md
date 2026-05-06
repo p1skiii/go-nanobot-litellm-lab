@@ -2,7 +2,7 @@
 
 ## Last Run
 
-Date: 2026-05-05 00:15:52 CST
+Date: 2026-05-06 10:52:26 CST
 Commit: working tree on base `729ec36`
 
 ## Commands
@@ -71,6 +71,11 @@ Commit: working tree on base `729ec36`
 | `go test ./...` for M6 | pass | all packages passed, including usage reader and usage API tests |
 | Compose rebuild with M6 binary | pass | local linux/arm64 nanobot binary copied into scratch image and container restarted |
 | `scripts/smoke-real-provider.sh` | pass | Docker Compose Go -> LiteLLM -> Xiaomi MiMo returned `200`; `/tasks/{id}`, `/usage/tasks/{id}`, and `/usage/recent` returned expected records |
+| `go test ./...` for M7 | pass | all packages passed |
+| `scripts/smoke-failure-cases.sh` | pass | empty diff `400`, streaming `400`, tiny LiteLLM timeout `504`, missing LiteLLM model `502`, recovery request `200` |
+| M7 timeout usage verification | pass | temporary Go service wrote failed usage record for timeout |
+| M7 missing model usage verification | pass | temporary Go service wrote failed usage record for LiteLLM invalid model response |
+| M7 recovery usage verification | pass | Compose Go -> LiteLLM -> Xiaomi MiMo wrote success usage with token fields |
 
 ## Known Failures
 
