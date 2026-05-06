@@ -12,7 +12,7 @@ func TestLoadUsesDefaultAddr(t *testing.T) {
 	t.Setenv("LITELLM_TIMEOUT", "")
 	t.Setenv("NANOBOT_MODELS_CONFIG", "")
 	t.Setenv("NANOBOT_POLICIES_CONFIG", "")
-	t.Setenv("NANOBOT_USAGE_LOG_PATH", "")
+	t.Setenv("NANOBOT_INVOCATION_LOG_PATH", "")
 
 	cfg := Load()
 	if cfg.Addr != defaultAddr {
@@ -36,8 +36,8 @@ func TestLoadUsesDefaultAddr(t *testing.T) {
 	if cfg.PoliciesConfigPath != defaultPoliciesConfigPath {
 		t.Fatalf("policies config path = %q, want %q", cfg.PoliciesConfigPath, defaultPoliciesConfigPath)
 	}
-	if cfg.UsageLogPath != defaultUsageLogPath {
-		t.Fatalf("usage log path = %q, want %q", cfg.UsageLogPath, defaultUsageLogPath)
+	if cfg.InvocationLogPath != defaultInvocationLogPath {
+		t.Fatalf("invocation log path = %q, want %q", cfg.InvocationLogPath, defaultInvocationLogPath)
 	}
 }
 
@@ -49,7 +49,7 @@ func TestLoadUsesEnvAddr(t *testing.T) {
 	t.Setenv("LITELLM_TIMEOUT", "2s")
 	t.Setenv("NANOBOT_MODELS_CONFIG", "/tmp/models.yaml")
 	t.Setenv("NANOBOT_POLICIES_CONFIG", "/tmp/policies.yaml")
-	t.Setenv("NANOBOT_USAGE_LOG_PATH", "/tmp/usage.jsonl")
+	t.Setenv("NANOBOT_INVOCATION_LOG_PATH", "/tmp/invocations.jsonl")
 
 	cfg := Load()
 	if cfg.Addr != ":18080" {
@@ -77,7 +77,7 @@ func TestLoadUsesEnvAddr(t *testing.T) {
 	if cfg.PoliciesConfigPath != "/tmp/policies.yaml" {
 		t.Fatalf("policies config path = %q, want /tmp/policies.yaml", cfg.PoliciesConfigPath)
 	}
-	if cfg.UsageLogPath != "/tmp/usage.jsonl" {
-		t.Fatalf("usage log path = %q, want /tmp/usage.jsonl", cfg.UsageLogPath)
+	if cfg.InvocationLogPath != "/tmp/invocations.jsonl" {
+		t.Fatalf("invocation log path = %q, want /tmp/invocations.jsonl", cfg.InvocationLogPath)
 	}
 }

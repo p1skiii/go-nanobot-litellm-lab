@@ -4,31 +4,22 @@
 
 | Check | Expected |
 |---|---|
-| empty diff | HTTP `400` |
-| streaming request | HTTP `400` |
-| timeout case | HTTP `504`, failed usage record |
-| missing model case | HTTP `502`, failed usage record |
-| recovery success | HTTP `200`, usage record with tokens |
+| empty diff | HTTP `400`, rejected invocation record |
+| streaming request | HTTP `400`, rejected invocation record |
+| timeout case | HTTP `504`, failed invocation record with `error_kind=timeout` |
+| missing model case | HTTP `502`, failed invocation record with `error_kind=downstream` |
+| recovery success | HTTP `200`, successful invocation record with usage tokens |
 
 ## Unit Tests
 
-M7 does not require new Go unit tests unless code changes are introduced.
+M7 itself does not require new Go behavior.
+M8 covers the ledger write/read behavior that M7 depends on.
 
 ## Real Provider Smoke
 
 | Test | Setup | Expected |
 |---|---|---|
 | failure replay script | Docker Compose LiteLLM + Xiaomi MiMo | all failure cases pass, then recovery request succeeds |
-
-## Latest Verification
-
-| Check | Status | Notes |
-|---|---|---|
-| `go test ./...` | pass | all packages passed |
-| `scripts/smoke-failure-cases.sh` | pass | empty diff `400`, streaming `400`, timeout `504`, missing model `502`, recovery `200` |
-| timeout usage record | pass | failed usage record contained task id, route reason, latency, and error |
-| missing model usage record | pass | failed usage record contained `model_alias=missing-model` and LiteLLM `400` body |
-| recovery usage record | pass | success record contained returned model and token usage |
 
 ## Non-goals
 

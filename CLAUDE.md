@@ -10,6 +10,8 @@ The purpose is to learn LLM gateway usage first, then gradually implement select
 - PolicyRouter
 - UsageLogger
 
+Execution facts belong in the Invocation Ledger; UsageLogger is a compatibility projection, not a separate source of truth.
+
 ## Current Architecture
 
 ```text
@@ -19,6 +21,8 @@ CLI / HTTP client
   -> PolicyRouter
   -> LiteLLM Proxy
   -> LLM provider or mock provider
+
+Invocation Ledger records execution facts around this path.
 ```
 
 ## Current Milestone
@@ -60,6 +64,12 @@ docker compose -f deploy/docker-compose.yml up
 1. Update `internal/router/`.
 2. Update `configs/policies.yaml`.
 3. Add `route_reason` assertions in tests.
+
+### Add a new execution fact
+
+1. Update `internal/invocation/`.
+2. Update `docs/specs/0008-unified-invocation-ledger.md`.
+3. Read from `/invocations/*`; use `/usage/*` only for compatibility projection.
 
 ## Required After Code Changes
 

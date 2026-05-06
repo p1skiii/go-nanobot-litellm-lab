@@ -14,7 +14,7 @@ services:
       LITELLM_TIMEOUT: "60s"
       NANOBOT_MODELS_CONFIG: "/app/configs/models.yaml"
       NANOBOT_POLICIES_CONFIG: "/app/configs/policies.yaml"
-      NANOBOT_USAGE_LOG_PATH: "/data/usage.jsonl"
+      NANOBOT_INVOCATION_LOG_PATH: "/data/invocations.jsonl"
     ports:
       - "8080:8080"
     depends_on:

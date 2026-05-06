@@ -4,34 +4,30 @@
 
 | Test | Expected |
 |---|---|
-| JSONL reader returns recent records | newest N records returned in chronological order |
-| JSONL reader filters by task id | only matching records returned |
+| JSONL ledger returns recent records | newest N records returned in chronological order |
+| JSONL ledger filters by task id | only matching records returned |
+| JSONL ledger filters by run id | only matching records returned |
 | missing JSONL file | empty records, no error |
 | malformed JSONL file | error returned |
 | invalid recent limit | HTTP 400 |
+| concurrent append and read | no malformed JSONL error |
 
-## Integration Tests
+## API Tests
 
 | Test | Setup | Expected |
 |---|---|---|
-| `GET /usage/recent` | temp JSONL file | records returned |
-| `GET /usage/tasks/{id}` | temp JSONL file | matching task records returned |
-| review then usage lookup | fake reviewer | task id appears in usage lookup |
+| `GET /invocations/recent` | temp ledger | records returned |
+| `GET /invocations/tasks/{id}` | temp ledger | matching task records returned |
+| `GET /invocations/runs/{run_id}` | temp ledger | matching run records returned |
+| `GET /usage/recent` | temp ledger | projected records returned |
+| `GET /usage/tasks/{id}` | temp ledger | projected task records returned |
 
 ## Real Provider Smoke
 
 | Test | Setup | Expected |
 |---|---|---|
-| review then recent usage | Go + LiteLLM + Xiaomi MiMo | `200`, task id, route reason, usage tokens |
-| compose review then usage lookup | Docker Compose + Xiaomi MiMo | task id appears in `/usage/tasks/{id}` |
-
-## Latest Verification
-
-| Check | Status | Notes |
-|---|---|---|
-| `go test ./...` | pass | all packages passed |
-| Compose rebuild with M6 binary | pass | nanobot image rebuilt from local linux/arm64 static binary |
-| `scripts/smoke-real-provider.sh` | pass | health, review, task lookup, usage by task, and recent usage passed through Docker Compose and Xiaomi MiMo |
+| review then recent invocations | Go + LiteLLM + Xiaomi MiMo | `200`, task id, route reason, usage tokens |
+| compose review then invocation lookup | Docker Compose + Xiaomi MiMo | task id appears in `/invocations/tasks/{id}` |
 
 ## Non-goals
 

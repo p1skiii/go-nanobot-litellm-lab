@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"go-nanobot-litellm-lab/internal/invocation"
 	"go-nanobot-litellm-lab/internal/litellm"
 	"go-nanobot-litellm-lab/internal/router"
 	"go-nanobot-litellm-lab/internal/tasks"
-	"go-nanobot-litellm-lab/internal/usage"
 )
 
 func TestHealth(t *testing.T) {
@@ -70,13 +70,16 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 			Usage:     litellm.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
 		},
 	}
-	usageLogger := &fakeUsageLogger{}
+	ledger := &fakeInvocationLedger{}
 	body := stringsReader(`{"diff":"diff --git a/a.go b/a.go","repo_summary":"Go service","stream":false}`)
 	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", body)
 	req.Header.Set("X-Request-ID", "req-test")
+	req.Header.Set("X-Run-ID", "run-test")
+	req.Header.Set("X-Attempt-ID", "attempt-test")
+	req.Header.Set("X-Scenario", "test.success")
 	rec := httptest.NewRecorder()
 
-	NewHandler(Options{Store: store, Reviewer: reviewer, UsageLogger: usageLogger, RequestTimeout: time.Second}).ServeHTTP(rec, req)
+	NewHandler(Options{Store: store, Reviewer: reviewer, InvocationLedger: ledger, RequestTimeout: time.Second}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
@@ -88,6 +91,12 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 	}
 	if resp.TaskID == "" {
 		t.Fatalf("task id is empty")
+	}
+	if resp.RunID != "run-test" {
+		t.Fatalf("run id = %q, want run-test", resp.RunID)
+	}
+	if resp.AttemptID != "attempt-test" {
+		t.Fatalf("attempt id = %q, want attempt-test", resp.AttemptID)
 	}
 	if resp.RequestID != "req-test" {
 		t.Fatalf("request id = %q, want req-test", resp.RequestID)
@@ -124,21 +133,42 @@ func TestReviewDiffSuccessStoresTask(t *testing.T) {
 	if strings.TrimSpace(reviewer.req.FinalContext) == "" {
 		t.Fatalf("reviewer final context is empty")
 	}
-	if len(usageLogger.records) != 1 {
-		t.Fatalf("usage records = %d, want 1", len(usageLogger.records))
+	if len(ledger.records) != 1 {
+		t.Fatalf("invocation records = %d, want 1", len(ledger.records))
 	}
-	record := usageLogger.records[0]
+	record := ledger.records[0]
+	if record.RunID != "run-test" {
+		t.Fatalf("invocation run id = %q, want run-test", record.RunID)
+	}
+	if record.AttemptID != "attempt-test" {
+		t.Fatalf("invocation attempt id = %q, want attempt-test", record.AttemptID)
+	}
+	if record.Scenario != "test.success" {
+		t.Fatalf("invocation scenario = %q, want test.success", record.Scenario)
+	}
 	if record.TaskID != resp.TaskID {
-		t.Fatalf("usage task id = %q, want %q", record.TaskID, resp.TaskID)
+		t.Fatalf("invocation task id = %q, want %q", record.TaskID, resp.TaskID)
 	}
-	if record.ModelAlias != "code-cheap" {
-		t.Fatalf("usage model alias = %q, want code-cheap", record.ModelAlias)
+	if record.TaskStatus != invocation.StatusSuccess {
+		t.Fatalf("invocation status = %q, want success", record.TaskStatus)
 	}
-	if record.ReturnedModel != "code-cheap" {
-		t.Fatalf("usage returned model = %q, want code-cheap", record.ReturnedModel)
+	if record.HTTPStatus != http.StatusOK {
+		t.Fatalf("invocation http status = %d, want 200", record.HTTPStatus)
 	}
-	if record.TotalTokens != 15 {
-		t.Fatalf("usage total tokens = %d, want 15", record.TotalTokens)
+	if record.ErrorKind != invocation.ErrorNone {
+		t.Fatalf("invocation error kind = %q, want none", record.ErrorKind)
+	}
+	if record.Usage == nil {
+		t.Fatalf("invocation usage is nil")
+	}
+	if record.Usage.ModelAlias != "code-cheap" {
+		t.Fatalf("usage model alias = %q, want code-cheap", record.Usage.ModelAlias)
+	}
+	if record.Usage.ReturnedModel != "code-cheap" {
+		t.Fatalf("usage returned model = %q, want code-cheap", record.Usage.ReturnedModel)
+	}
+	if record.Usage.TotalTokens != 15 {
+		t.Fatalf("usage total tokens = %d, want 15", record.Usage.TotalTokens)
 	}
 }
 
@@ -173,22 +203,22 @@ func TestGetTask(t *testing.T) {
 }
 
 func TestGetRecentUsage(t *testing.T) {
-	reader := &fakeUsageReader{
-		recent: []usage.Record{
-			{TaskID: "task_1", Status: "success"},
-			{TaskID: "task_2", Status: "failed"},
+	ledger := &fakeInvocationLedger{
+		recent: []invocation.Record{
+			{TaskID: "task_1", TaskStatus: invocation.StatusSuccess},
+			{TaskID: "task_2", TaskStatus: invocation.StatusFailed},
 		},
 	}
 	req := httptest.NewRequest(http.MethodGet, "/usage/recent?limit=2", nil)
 	rec := httptest.NewRecorder()
 
-	NewHandler(Options{UsageReader: reader}).ServeHTTP(rec, req)
+	NewHandler(Options{InvocationLedger: ledger}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
 	}
-	if reader.limit != 2 {
-		t.Fatalf("limit = %d, want 2", reader.limit)
+	if ledger.limit != 2 {
+		t.Fatalf("limit = %d, want 2", ledger.limit)
 	}
 
 	var resp usageListResponse
@@ -212,21 +242,21 @@ func TestGetRecentUsageRejectsInvalidLimit(t *testing.T) {
 }
 
 func TestGetUsageByTask(t *testing.T) {
-	reader := &fakeUsageReader{
-		byTask: []usage.Record{
-			{TaskID: "task_test", Status: "success"},
+	ledger := &fakeInvocationLedger{
+		byTask: []invocation.Record{
+			{TaskID: "task_test", TaskStatus: invocation.StatusSuccess},
 		},
 	}
 	req := httptest.NewRequest(http.MethodGet, "/usage/tasks/task_test", nil)
 	rec := httptest.NewRecorder()
 
-	NewHandler(Options{UsageReader: reader}).ServeHTTP(rec, req)
+	NewHandler(Options{InvocationLedger: ledger}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
 	}
-	if reader.taskID != "task_test" {
-		t.Fatalf("task id = %q, want task_test", reader.taskID)
+	if ledger.taskID != "task_test" {
+		t.Fatalf("task id = %q, want task_test", ledger.taskID)
 	}
 
 	var resp usageListResponse
@@ -241,14 +271,132 @@ func TestGetUsageByTask(t *testing.T) {
 	}
 }
 
-func TestReviewDiffRejectsEmptyDiff(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"  "}`))
+func TestGetRecentInvocations(t *testing.T) {
+	ledger := &fakeInvocationLedger{
+		recent: []invocation.Record{
+			{RunID: "run_1", AttemptID: "attempt_1", TaskID: "task_1", TaskStatus: invocation.StatusSuccess},
+			{RunID: "run_2", AttemptID: "attempt_2", TaskID: "task_2", TaskStatus: invocation.StatusFailed},
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/invocations/recent?limit=2", nil)
 	rec := httptest.NewRecorder()
 
-	NewHandler(Options{Reviewer: &fakeReviewer{}}).ServeHTTP(rec, req)
+	NewHandler(Options{InvocationLedger: ledger}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if ledger.limit != 2 {
+		t.Fatalf("limit = %d, want 2", ledger.limit)
+	}
+
+	var resp invocationListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Count != 2 {
+		t.Fatalf("count = %d, want 2", resp.Count)
+	}
+	if resp.Records[0].RunID != "run_1" {
+		t.Fatalf("run id = %q, want run_1", resp.Records[0].RunID)
+	}
+}
+
+func TestGetInvocationsByTask(t *testing.T) {
+	ledger := &fakeInvocationLedger{
+		byTask: []invocation.Record{
+			{RunID: "run_test", AttemptID: "attempt_test", TaskID: "task_test", TaskStatus: invocation.StatusSuccess},
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/invocations/tasks/task_test", nil)
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{InvocationLedger: ledger}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if ledger.taskID != "task_test" {
+		t.Fatalf("task id = %q, want task_test", ledger.taskID)
+	}
+
+	var resp invocationListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.TaskID != "task_test" {
+		t.Fatalf("response task id = %q, want task_test", resp.TaskID)
+	}
+	if resp.Count != 1 {
+		t.Fatalf("count = %d, want 1", resp.Count)
+	}
+}
+
+func TestGetInvocationsByRun(t *testing.T) {
+	ledger := &fakeInvocationLedger{
+		byRun: []invocation.Record{
+			{RunID: "run_test", AttemptID: "attempt_test", TaskID: "task_test", TaskStatus: invocation.StatusSuccess},
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/invocations/runs/run_test", nil)
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{InvocationLedger: ledger}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if ledger.runID != "run_test" {
+		t.Fatalf("run id = %q, want run_test", ledger.runID)
+	}
+
+	var resp invocationListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.RunID != "run_test" {
+		t.Fatalf("response run id = %q, want run_test", resp.RunID)
+	}
+	if resp.Count != 1 {
+		t.Fatalf("count = %d, want 1", resp.Count)
+	}
+}
+
+func TestReviewDiffRejectsEmptyDiff(t *testing.T) {
+	ledger := &fakeInvocationLedger{}
+	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"  "}`))
+	req.Header.Set("X-Run-ID", "run-reject")
+	req.Header.Set("X-Attempt-ID", "attempt-reject")
+	rec := httptest.NewRecorder()
+
+	NewHandler(Options{Reviewer: &fakeReviewer{}, InvocationLedger: ledger}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+	if len(ledger.records) != 1 {
+		t.Fatalf("invocation records = %d, want 1", len(ledger.records))
+	}
+	record := ledger.records[0]
+	if record.TaskID != "" {
+		t.Fatalf("rejected record task id = %q, want empty", record.TaskID)
+	}
+	if record.RunID != "run-reject" || record.AttemptID != "attempt-reject" {
+		t.Fatalf("rejected ids = %q/%q, want run-reject/attempt-reject", record.RunID, record.AttemptID)
+	}
+	if record.TaskStatus != invocation.StatusRejected {
+		t.Fatalf("rejected status = %q, want rejected", record.TaskStatus)
+	}
+	if record.ErrorKind != invocation.ErrorValidation {
+		t.Fatalf("error kind = %q, want validation", record.ErrorKind)
+	}
+
+	var body errorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if body.RunID != "run-reject" || body.AttemptID != "attempt-reject" {
+		t.Fatalf("error response ids = %q/%q, want run-reject/attempt-reject", body.RunID, body.AttemptID)
 	}
 }
 
@@ -264,38 +412,57 @@ func TestReviewDiffRejectsStreaming(t *testing.T) {
 }
 
 func TestReviewDiffMapsTimeoutTo504(t *testing.T) {
+	ledger := &fakeInvocationLedger{}
 	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff"}`))
 	rec := httptest.NewRecorder()
 
-	NewHandler(Options{Reviewer: &fakeReviewer{err: &litellm.Error{Kind: litellm.KindTimeout, Err: context.DeadlineExceeded}}}).ServeHTTP(rec, req)
+	NewHandler(Options{Reviewer: &fakeReviewer{err: &litellm.Error{Kind: litellm.KindTimeout, Err: context.DeadlineExceeded}}, InvocationLedger: ledger}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusGatewayTimeout {
 		t.Fatalf("status = %d, want 504; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(ledger.records) != 1 {
+		t.Fatalf("invocation records = %d, want 1", len(ledger.records))
+	}
+	if ledger.records[0].ErrorKind != invocation.ErrorTimeout {
+		t.Fatalf("error kind = %q, want timeout", ledger.records[0].ErrorKind)
+	}
+	if ledger.records[0].TaskStatus != invocation.StatusFailed {
+		t.Fatalf("task status = %q, want failed", ledger.records[0].TaskStatus)
 	}
 }
 
 func TestReviewDiffMapsDownstreamErrorTo502(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff"}`))
 	rec := httptest.NewRecorder()
-	usageLogger := &fakeUsageLogger{}
+	ledger := &fakeInvocationLedger{}
 
-	NewHandler(Options{Reviewer: &fakeReviewer{err: &litellm.Error{Kind: litellm.KindDownstream, Err: errors.New("downstream failed")}}, UsageLogger: usageLogger}).ServeHTTP(rec, req)
+	NewHandler(Options{Reviewer: &fakeReviewer{err: &litellm.Error{Kind: litellm.KindDownstream, Err: errors.New("downstream failed")}}, InvocationLedger: ledger}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("status = %d, want 502; body=%s", rec.Code, rec.Body.String())
 	}
-	if len(usageLogger.records) != 1 {
-		t.Fatalf("usage records = %d, want 1", len(usageLogger.records))
+	if len(ledger.records) != 1 {
+		t.Fatalf("invocation records = %d, want 1", len(ledger.records))
 	}
-	if usageLogger.records[0].Status != string(tasks.StatusFailed) {
-		t.Fatalf("usage status = %q, want failed", usageLogger.records[0].Status)
+	if ledger.records[0].TaskStatus != invocation.StatusFailed {
+		t.Fatalf("invocation status = %q, want failed", ledger.records[0].TaskStatus)
 	}
-	if usageLogger.records[0].Error == "" {
+	if ledger.records[0].ErrorKind != invocation.ErrorDownstream {
+		t.Fatalf("invocation error kind = %q, want downstream", ledger.records[0].ErrorKind)
+	}
+	if ledger.records[0].Usage == nil {
+		t.Fatalf("invocation usage is nil")
+	}
+	if ledger.records[0].Usage.Status != string(tasks.StatusFailed) {
+		t.Fatalf("usage status = %q, want failed", ledger.records[0].Usage.Status)
+	}
+	if ledger.records[0].Usage.Error == "" {
 		t.Fatalf("usage error is empty")
 	}
 }
 
-func TestReviewDiffUsageWriteFailureDoesNotFailTask(t *testing.T) {
+func TestReviewDiffInvocationWriteFailureDoesNotFailTask(t *testing.T) {
 	reviewer := &fakeReviewer{
 		resp: litellm.ReviewResponse{
 			Result:    "review result",
@@ -306,7 +473,7 @@ func TestReviewDiffUsageWriteFailureDoesNotFailTask(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/tasks/review-diff", stringsReader(`{"diff":"diff"}`))
 	rec := httptest.NewRecorder()
 
-	NewHandler(Options{Reviewer: reviewer, UsageLogger: &fakeUsageLogger{err: errors.New("write failed")}}).ServeHTTP(rec, req)
+	NewHandler(Options{Reviewer: reviewer, InvocationLedger: &fakeInvocationLedger{err: errors.New("write failed")}}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
@@ -430,32 +597,35 @@ func (f *fakePolicyRouter) Route(_ router.Input) (router.Decision, error) {
 	return f.decision, nil
 }
 
-type fakeUsageLogger struct {
-	records []usage.Record
+type fakeInvocationLedger struct {
+	records []invocation.Record
+	recent  []invocation.Record
+	byTask  []invocation.Record
+	byRun   []invocation.Record
+	limit   int
+	taskID  string
+	runID   string
 	err     error
 }
 
-func (f *fakeUsageLogger) Log(record usage.Record) error {
+func (f *fakeInvocationLedger) Log(record invocation.Record) error {
 	f.records = append(f.records, record)
 	return f.err
 }
 
-type fakeUsageReader struct {
-	recent []usage.Record
-	byTask []usage.Record
-	limit  int
-	taskID string
-	err    error
-}
-
-func (f *fakeUsageReader) Recent(limit int) ([]usage.Record, error) {
+func (f *fakeInvocationLedger) Recent(limit int) ([]invocation.Record, error) {
 	f.limit = limit
 	return f.recent, f.err
 }
 
-func (f *fakeUsageReader) ForTask(taskID string) ([]usage.Record, error) {
+func (f *fakeInvocationLedger) ForTask(taskID string) ([]invocation.Record, error) {
 	f.taskID = taskID
 	return f.byTask, f.err
+}
+
+func (f *fakeInvocationLedger) ForRun(runID string) ([]invocation.Record, error) {
+	f.runID = runID
+	return f.byRun, f.err
 }
 
 func stringsReader(s string) *strings.Reader {

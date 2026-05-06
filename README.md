@@ -7,10 +7,11 @@ The project starts with LiteLLM instead of a custom gateway. After the local loo
 - ContextManager
 - PolicyRouter
 - UsageLogger
+- Invocation Ledger
 
 ## Current Milestone
 
-M5 UsageLogger and Docker Compose runtime verification are complete. The next planned milestone is M6 local lab query loop.
+M8 Invocation Ledger consolidation is in progress. The next planned milestones are M9 PolicyRouter Evaluation and M10 ContextManager Evaluation.
 
 ## Local Commands
 
@@ -30,6 +31,8 @@ HTTP client
   -> PolicyRouter
   -> LiteLLM Proxy
   -> LLM provider or mock provider
+
+Invocation Ledger records execution facts around this path.
 ```
 
 ## Implemented Milestones
@@ -41,7 +44,10 @@ HTTP client
 | M2 | done | real provider-backed LiteLLM behavior study |
 | M3 | done | deterministic ContextManager with `context_report` |
 | M4 | done | score-based PolicyRouter with `route_reason` |
-| M5 | done | task-level UsageLogger, real provider E2E, and Docker Compose runtime E2E |
+| M5 | done | usage projection over execution records |
+| M6 | done | local lab query loop |
+| M7 | done | failure replay lab |
+| M8 | in progress | Invocation Ledger consolidation |
 
 ## Project Harness
 

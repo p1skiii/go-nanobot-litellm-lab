@@ -2,19 +2,23 @@
 
 ## Purpose
 
-Expose a minimal read path for local task and usage inspection after M5 writes append-only usage records.
+Expose a minimal read path for local task, invocation, and usage inspection.
+
+After ADR-0003, the query loop reads Invocation Ledger records first.
+Usage APIs remain as compatibility projections.
 
 ## Inputs
 
 | Input | Source |
 |---|---|
-| usage log path | `NANOBOT_USAGE_LOG_PATH` |
-| limit | `GET /usage/recent?limit=N` |
-| task id | `GET /usage/tasks/{id}` |
+| invocation log path | `NANOBOT_INVOCATION_LOG_PATH` |
+| limit | `GET /invocations/recent?limit=N` or `GET /usage/recent?limit=N` |
+| task id | `GET /invocations/tasks/{id}` or `GET /usage/tasks/{id}` |
+| run id | `GET /invocations/runs/{run_id}` |
 
 ## Outputs
 
-### `GET /usage/recent`
+### `GET /invocations/recent`
 
 ```json
 {
@@ -23,7 +27,7 @@ Expose a minimal read path for local task and usage inspection after M5 writes a
 }
 ```
 
-### `GET /usage/tasks/{id}`
+### `GET /invocations/tasks/{id}`
 
 ```json
 {
@@ -33,36 +37,51 @@ Expose a minimal read path for local task and usage inspection after M5 writes a
 }
 ```
 
-Records use the UsageLogger record shape from Spec 0005.
+### `GET /invocations/runs/{run_id}`
+
+```json
+{
+  "run_id": "run_abc",
+  "count": 1,
+  "records": []
+}
+```
+
+Legacy `/usage/*` endpoints return `usage.Record` projections from these invocation records.
 
 ## Data Structures
 
-- Keep JSONL as the source of truth.
-- Read records in append order.
-- Return recent records in chronological order.
+- Invocation Ledger is the source of truth.
+- Records are returned in append order.
+- Recent records are returned in chronological order.
+- JSONL read and write share one mutex.
 
 ## Error Cases
 
 | Case | Expected |
 |---|---|
-| usage file missing | return empty list |
+| invocation file missing | return empty list |
 | invalid `limit` | 400 |
 | malformed JSONL line | 500 |
 | empty task id | 404 |
+| empty run id | 404 |
 
 ## Config
 
-No new config. M6 reuses `NANOBOT_USAGE_LOG_PATH`.
+No query-specific config.
+Use `NANOBOT_INVOCATION_LOG_PATH`.
 
 ## Test Matrix
 
 | Test | Expected |
 |---|---|
-| read recent usage | returns newest records |
-| read usage by task id | returns matching records |
-| missing usage file | returns empty list |
+| read recent invocations | returns newest records |
+| read invocations by task id | returns matching records |
+| read invocations by run id | returns matching records |
+| read legacy usage projection | returns projected records |
+| missing invocation file | returns empty list |
 | invalid limit | 400 |
-| smoke script can submit task and inspect usage | pass |
+| smoke script can submit task and inspect invocation | pass |
 
 ## Non-goals
 

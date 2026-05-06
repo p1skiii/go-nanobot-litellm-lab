@@ -491,3 +491,51 @@ Implication for our Go service:
 - LiteLLM `400` for invalid model alias remains an internal upstream problem for the Go service and maps to client `502`.
 - A recovery request after failure cases proves failed attempts do not poison the in-memory task store, usage logger, or LiteLLM client.
 - M7 does not require Go-owned fallback; LiteLLM behavior remains the reference until a later milestone explicitly changes that boundary.
+
+## M8 Invocation Ledger Observations
+
+Date: 2026-05-06 11:33:54 CST
+
+Setup:
+
+- Existing Docker Compose LiteLLM container stayed running with real Xiaomi MiMo-backed `code-cheap` and `code-smart`.
+- Nanobot was rebuilt from source with the multi-stage Dockerfile.
+- Source of truth moved to `data/invocations.jsonl`.
+- Smoke script: `scripts/smoke-real-provider.sh`
+- Failure replay script: `scripts/smoke-failure-cases.sh`
+
+Observed response:
+
+| Case | Observed |
+|---|---|
+| real provider smoke | `200`, `run_id`, `attempt_id`, `task_id`, `route_reason`, `context_report` |
+| invocation by task | one record with `task_status=success`, `error_kind=none`, nested usage tokens |
+| invocation by run | same record queryable by shared `run_id` |
+| legacy usage projection | `/usage/tasks/{id}` returned projected `usage.Record` |
+| empty diff | `400`, rejected invocation record, no task id |
+| streaming requested | `400`, rejected invocation record, no task id |
+| tiny timeout | `504`, failed invocation record with `error_kind=timeout` |
+| missing model | `502`, failed invocation record with `error_kind=downstream` |
+| recovery request | `200`, successful invocation record with token usage |
+
+Specific M8 values from smoke runs:
+
+- Real provider smoke:
+  - task id: `task_4fbeadd6f901ac90`
+  - run id: `run_1778038406`
+  - attempt id: `attempt_2fa382f585c49cbc`
+  - model alias: `code-cheap`
+  - latency: `3474ms`
+  - usage: `prompt_tokens=98`, `completion_tokens=222`, `total_tokens=320`
+- Failure replay:
+  - timeout task id: `task_cff719f54b8f2791`, `error_kind=timeout`
+  - missing model task id: `task_30c5d678825e3dbc`, `error_kind=downstream`
+  - recovery task id: `task_3b358219789e248d`, `total_tokens=295`
+
+Implication for our Go service:
+
+- Router, ContextManager, Usage, Replay, Debug, and future Evaluation should read Invocation Ledger records.
+- Usage is now a compatibility projection, not its own source of truth.
+- Validation failures can be compared with task attempts because they share `run_id`, `attempt_id`, scenario, HTTP status, and error kind.
+- M9 should compare `code-cheap` and `code-smart` through shared-run ledger records before changing Router weights.
+- M10 should compare ContextManager input variants through shared-run ledger records before changing context rules.

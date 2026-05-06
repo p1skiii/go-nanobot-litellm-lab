@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-M7 Failure Replay Lab
+M8 Invocation Ledger Consolidation
 
 ## Completed
 
@@ -77,6 +77,22 @@ M7 Failure Replay Lab
 - M7 `go test ./...` passed
 - M7 failure replay smoke passed against Docker Compose LiteLLM and real Xiaomi MiMo recovery path
 - M7 behavior notes updated with timeout, missing model, validation, and recovery observations
+- M8 proposal accepted in `docs/proposals/0005-unify-m5-m8-invocation-ledger.md`
+- ADR-0003 added for Invocation Ledger as the observability boundary
+- Spec 0008 and test plan added for Unified Invocation Ledger
+- Specs 0005-0007 updated so Usage, query APIs, and failure replay are projections over Invocation Ledger
+- M9 PolicyRouter Evaluation and M10 ContextManager Evaluation specs added
+- `internal/invocation` added with append-only JSONL ledger and shared read/write mutex
+- API now writes invocation records for success, failed, and rejected review requests
+- API now exposes `/invocations/recent`, `/invocations/tasks/{id}`, and `/invocations/runs/{run_id}`
+- Legacy `/usage/*` now reads Invocation Ledger and returns usage projections
+- `POST /tasks/review-diff` now returns `run_id` and `attempt_id`
+- Compose Dockerfile updated to build from source instead of gitignored `deploy/bin/nanobot`
+- M8 `go test ./...` passed
+- M8 Docker Compose config passed
+- M8 Docker Compose nanobot image built from source with multi-stage Dockerfile
+- M8 real provider smoke passed through Go -> LiteLLM -> Xiaomi MiMo and wrote invocation records
+- M8 failure replay smoke passed with rejected, failed, and recovery invocation records
 
 ## In Progress
 
@@ -88,4 +104,4 @@ M7 Failure Replay Lab
 
 ## Next Step
 
-Review and commit M7 failure replay lab.
+Start M9 PolicyRouter Evaluation using shared-run Invocation Ledger comparisons.

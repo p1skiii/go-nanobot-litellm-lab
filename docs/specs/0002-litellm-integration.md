@@ -20,8 +20,8 @@ Call LiteLLM Proxy as downstream gateway.
 | Output | Consumer |
 |---|---|
 | assistant text | task result |
-| returned model | task metadata and future UsageLogger |
-| usage fields | UsageLogger |
+| returned model | task metadata and Invocation Ledger |
+| usage fields | Invocation Ledger usage projection |
 | latency | telemetry and task metadata |
 | downstream error | API error mapper |
 
@@ -46,7 +46,7 @@ Current behavior:
 - `ReviewRequest.FinalContext` is used as the user message when present.
 - `ReviewRequest.ModelAlias` overrides the default client model when present.
 - Non-2xx LiteLLM responses are mapped to service `502`, except local timeout maps to `504`.
-- Usage fields are not persisted yet. M5 owns usage extraction and logging.
+- Usage fields are extracted for non-stream responses and persisted through Invocation Ledger.
 
 ## Error Cases
 
@@ -82,4 +82,4 @@ Current behavior:
 - Do not implement provider adapters directly.
 - Do not bypass LiteLLM in M1.
 - Do not implement streaming before non-stream works.
-- Do not store usage in the LiteLLM client before M5.
+- Do not make the LiteLLM client own storage.

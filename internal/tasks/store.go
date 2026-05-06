@@ -17,6 +17,8 @@ const (
 
 type Task struct {
 	ID          string
+	RunID       string
+	AttemptID   string
 	RequestID   string
 	Status      Status
 	Result      string
